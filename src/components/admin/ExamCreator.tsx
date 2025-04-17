@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/sonner';
 import { useAuth } from '@/contexts/AuthContext';
-import { FileUpload, Clock, Settings, Save } from 'lucide-react';
+import { Upload, Clock, Settings, Save } from 'lucide-react';
 import QuestionEditor from './QuestionEditor';
 
 export default function ExamCreator() {
@@ -162,7 +162,7 @@ export default function ExamCreator() {
                   </>
                 ) : (
                   <>
-                    <FileUpload size={18} className="mr-2" />
+                    <Upload size={18} className="mr-2" />
                     Generate Questions
                   </>
                 )}
@@ -198,3 +198,4 @@ export default function ExamCreator() {
     </div>
   );
 }
+
