@@ -1,14 +1,12 @@
 
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Exam, Submission } from '@/contexts/DataContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { useData, Exam, Submission } from '@/contexts/DataContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { ArrowLeft, CheckCircle, XCircle, AlertCircle, PieChart, Clock, Award, Target } from 'lucide-react';
-import { ChartContainer } from '../ui/chart';
-import { PieChart as RechartsPlot, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
+import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend } from 'recharts';
+import { CheckCircle, XCircle, Clock, Award, AlertTriangle, FileText } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 
 interface StudentResultsProps {
   exam: Exam;
@@ -16,249 +14,294 @@ interface StudentResultsProps {
 }
 
 export default function StudentResults({ exam, submission }: StudentResultsProps) {
-  const navigate = useNavigate();
+  const [correctAnswers, setCorrectAnswers] = useState(0);
+  const [incorrectAnswers, setIncorrectAnswers] = useState(0);
+  const [timePerQuestion, setTimePerQuestion] = useState(0);
+  const [pieChartData, setPieChartData] = useState<{ name: string; value: number }[]>([]);
+  const [questionTypeData, setQuestionTypeData] = useState<{ name: string; correct: number; incorrect: number }[]>([]);
   
+  const COLORS = ['#4ade80', '#f87171'];
+  
+  useEffect(() => {
+    // Calculate correct and incorrect answers
+    let correct = 0;
+    let incorrect = 0;
+    
+    const mcqCorrect = { correct: 0, incorrect: 0 };
+    const fillBlankCorrect = { correct: 0, incorrect: 0 };
+    
+    exam.questions.forEach((question, index) => {
+      if (submission.answers[index] === question.correctAnswer) {
+        correct++;
+        if (question.type === 'mcq') {
+          mcqCorrect.correct++;
+        } else {
+          fillBlankCorrect.correct++;
+        }
+      } else {
+        incorrect++;
+        if (question.type === 'mcq') {
+          mcqCorrect.incorrect++;
+        } else {
+          fillBlankCorrect.incorrect++;
+        }
+      }
+    });
+    
+    setCorrectAnswers(correct);
+    setIncorrectAnswers(incorrect);
+    
+    // Set chart data
+    setPieChartData([
+      { name: 'Correct', value: correct },
+      { name: 'Incorrect', value: incorrect }
+    ]);
+    
+    // Set question type data
+    const typeData = [];
+    if (mcqCorrect.correct > 0 || mcqCorrect.incorrect > 0) {
+      typeData.push({
+        name: 'Multiple Choice',
+        correct: mcqCorrect.correct,
+        incorrect: mcqCorrect.incorrect
+      });
+    }
+    
+    if (fillBlankCorrect.correct > 0 || fillBlankCorrect.incorrect > 0) {
+      typeData.push({
+        name: 'Fill in the Blank',
+        correct: fillBlankCorrect.correct,
+        incorrect: fillBlankCorrect.incorrect
+      });
+    }
+    
+    setQuestionTypeData(typeData);
+    
+    // Calculate average time per question based on exam duration
+    const totalTimeInSeconds = exam.duration * 60;
+    const avgTimePerQuestion = totalTimeInSeconds / exam.questions.length;
+    setTimePerQuestion(avgTimePerQuestion);
+  }, [exam, submission]);
+  
+  // Chart data
+  const renderCustomizedLabel = ({ cx, cy, midAngle, innerRadius, outerRadius, percent }: any) => {
+    const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
+    const x = cx + radius * Math.cos(-midAngle * Math.PI / 180);
+    const y = cy + radius * Math.sin(-midAngle * Math.PI / 180);
+    
+    return (
+      <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central">
+        {`${(percent * 100).toFixed(0)}%`}
+      </text>
+    );
+  };
+  
+  // Format time (seconds to MM:SS)
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.round(seconds % 60);
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+  
+  // Format date
   const formatDate = (date: Date) => {
-    return new Date(date).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
+    return new Date(date).toLocaleString('en-US', {
       day: 'numeric',
+      month: 'short',
+      year: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
     });
   };
   
-  const getScoreColor = () => {
-    if (submission.score >= 80) return 'text-green-600';
-    if (submission.score >= 60) return 'text-yellow-600';
-    if (submission.score >= 40) return 'text-orange-600';
-    return 'text-red-600';
+  // Determine performance level
+  const getPerformanceLevel = (score: number) => {
+    if (score >= 90) return { text: 'Excellent', color: 'bg-green-500' };
+    if (score >= 75) return { text: 'Good', color: 'bg-blue-500' };
+    if (score >= 60) return { text: 'Satisfactory', color: 'bg-yellow-500' };
+    if (score >= 40) return { text: 'Needs Improvement', color: 'bg-orange-500' };
+    return { text: 'Unsatisfactory', color: 'bg-red-500' };
   };
   
-  const getScoreBgColor = () => {
-    if (submission.score >= 80) return 'bg-green-100';
-    if (submission.score >= 60) return 'bg-yellow-100';
-    if (submission.score >= 40) return 'bg-orange-100';
-    return 'bg-red-100';
-  };
-  
-  const getPerformanceText = () => {
-    if (submission.score >= 80) return 'Excellent! You have mastered this subject.';
-    if (submission.score >= 60) return 'Good job! You have a solid understanding of the material.';
-    if (submission.score >= 40) return 'Fair. Some concepts need more review.';
-    return 'Needs improvement. Consider studying the material again.';
-  };
-  
-  const correctAnswers = submission.answers.filter(
-    (answer, index) => answer === exam.questions[index].correctAnswer
-  ).length;
-  
-  const incorrectAnswers = exam.questions.length - correctAnswers;
-  
-  // Categorized questions data
-  const [timePerQuestion, setTimePerQuestion] = useState<number>(0);
-  
-  useEffect(() => {
-    // Calculate average time per question based on exam duration
-    const totalTimeInSeconds = exam.duration * 60;
-    const avgTimePerQuestion = totalTimeInSeconds / exam.questions.length;
-    setTimePerQuestion(avgTimePerQuestion);
-  }, [exam]);
-  
-  // Chart data
-  const scoreData = [
-    { name: 'Correct', value: correctAnswers, color: '#4ade80' },
-    { name: 'Incorrect', value: incorrectAnswers, color: '#f87171' },
-  ];
+  const performanceLevel = getPerformanceLevel(submission.score);
   
   return (
     <div className="space-y-6">
-      <Button variant="ghost" onClick={() => navigate('/student/dashboard')}>
-        <ArrowLeft size={16} className="mr-1" /> Back to Dashboard
-      </Button>
+      <Card>
+        <CardHeader>
+          <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
+            <div>
+              <CardTitle>Exam Results: {exam.title}</CardTitle>
+              <CardDescription>
+                Submitted on {formatDate(submission.submittedAt)}
+              </CardDescription>
+            </div>
+            <Badge className={`${performanceLevel.color} px-3 py-1 text-white`}>
+              <Award className="mr-1 h-4 w-4" />
+              {performanceLevel.text}
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="flex flex-col justify-center items-center text-center">
+              <div className="text-5xl font-bold mb-2">{Math.round(submission.score)}%</div>
+              <p className="text-gray-500">Your Score</p>
+              <div className="w-full mt-4">
+                <Progress value={submission.score} className="h-3" />
+              </div>
+              <div className="mt-4 flex flex-col gap-2 text-sm w-full">
+                <div className="flex justify-between">
+                  <span className="flex items-center">
+                    <CheckCircle className="h-4 w-4 text-green-500 mr-1" /> Correct Answers:
+                  </span>
+                  <span className="font-medium">{correctAnswers} of {exam.questions.length}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="flex items-center">
+                    <XCircle className="h-4 w-4 text-red-500 mr-1" /> Incorrect Answers:
+                  </span>
+                  <span className="font-medium">{incorrectAnswers} of {exam.questions.length}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="flex items-center">
+                    <Clock className="h-4 w-4 text-blue-500 mr-1" /> Time Per Question:
+                  </span>
+                  <span className="font-medium">{formatTime(timePerQuestion)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="flex items-center">
+                    <FileText className="h-4 w-4 text-purple-500 mr-1" /> Total Questions:
+                  </span>
+                  <span className="font-medium">{exam.questions.length}</span>
+                </div>
+              </div>
+            </div>
+            
+            <div className="h-64">
+              <p className="text-center font-medium mb-2">Performance Summary</p>
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={pieChartData}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={renderCustomizedLabel}
+                    outerRadius={80}
+                    fill="#8884d8"
+                    dataKey="value"
+                  >
+                    {pieChartData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Legend />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+          
+          {questionTypeData.length > 1 && (
+            <div className="mt-8">
+              <p className="text-center font-medium mb-4">Performance by Question Type</p>
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart
+                    data={questionTypeData}
+                    margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
+                  >
+                    <XAxis dataKey="name" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Bar name="Correct" dataKey="correct" fill="#4ade80" />
+                    <Bar name="Incorrect" dataKey="incorrect" fill="#f87171" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
       
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <Card className="md:col-span-3">
-          <CardHeader>
-            <CardTitle>{exam.title} - Your Results</CardTitle>
-            <CardDescription>
-              Completed on {formatDate(submission.submittedAt)}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className={`p-6 rounded-lg ${getScoreBgColor()} text-center mb-6`}>
-              <h2 className="text-2xl font-bold mb-2">Your Score</h2>
-              <p className={`text-4xl font-bold ${getScoreColor()}`}>
-                {submission.score.toFixed(1)}%
-              </p>
-              <p className="mt-2">
-                {correctAnswers} out of {exam.questions.length} questions correct
-              </p>
-              <p className="mt-3 font-medium">{getPerformanceText()}</p>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="text-center">
-                    <Award className="h-8 w-8 mx-auto mb-2 text-blue-500" />
-                    <h3 className="font-medium">Score</h3>
-                    <p className={`text-2xl font-bold ${getScoreColor()}`}>{submission.score.toFixed(1)}%</p>
-                  </div>
-                </CardContent>
-              </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>Question Analysis</CardTitle>
+          <CardDescription>Detailed breakdown of your answers</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {exam.questions.map((question, qIndex) => {
+              const isCorrect = submission.answers[qIndex] === question.correctAnswer;
+              const selectedAnswer = submission.answers[qIndex];
               
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="text-center">
-                    <Target className="h-8 w-8 mx-auto mb-2 text-green-500" />
-                    <h3 className="font-medium">Accuracy</h3>
-                    <p className="text-2xl font-bold text-green-600">
-                      {((correctAnswers / exam.questions.length) * 100).toFixed(1)}%
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-              
-              <Card>
-                <CardContent className="pt-6">
-                  <div className="text-center">
-                    <Clock className="h-8 w-8 mx-auto mb-2 text-orange-500" />
-                    <h3 className="font-medium">Avg. Time per Question</h3>
-                    <p className="text-2xl font-bold text-orange-600">{timePerQuestion.toFixed(0)}s</p>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Score Distribution</CardTitle>
-                </CardHeader>
-                <CardContent className="h-64">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <RechartsPlot>
-                      <Pie
-                        data={scoreData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={60}
-                        outerRadius={80}
-                        paddingAngle={5}
-                        dataKey="value"
-                        label={({name, percent}) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                      >
-                        {scoreData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                    </RechartsPlot>
-                  </ResponsiveContainer>
-                </CardContent>
-              </Card>
-              
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Performance Summary</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div>
-                    <div className="flex justify-between mb-1">
-                      <span className="text-sm font-medium">Correct Answers</span>
-                      <span className="text-sm font-medium text-green-600">{correctAnswers} / {exam.questions.length}</span>
-                    </div>
-                    <Progress value={(correctAnswers / exam.questions.length) * 100} className="h-2 bg-gray-100" />
-                  </div>
-                  
-                  <div>
-                    <div className="flex justify-between mb-1">
-                      <span className="text-sm font-medium">Incorrect Answers</span>
-                      <span className="text-sm font-medium text-red-600">{incorrectAnswers} / {exam.questions.length}</span>
-                    </div>
-                    <Progress value={(incorrectAnswers / exam.questions.length) * 100} className="h-2 bg-gray-100" />
-                  </div>
-                  
-                  <div className="pt-4">
-                    <h4 className="font-medium mb-2">Improvement Areas:</h4>
-                    <ul className="space-y-1 text-sm">
-                      {incorrectAnswers > 0 ? (
-                        <li className="flex items-start">
-                          <AlertCircle className="h-4 w-4 mr-1 text-yellow-500 mt-0.5" />
-                          <span>Review the incorrect answers below to strengthen your understanding.</span>
-                        </li>
+              return (
+                <div
+                  key={qIndex}
+                  className={`p-4 rounded-md ${
+                    isCorrect ? 'bg-green-50 border border-green-200' : 'bg-red-50 border border-red-200'
+                  }`}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="mt-1">
+                      {isCorrect ? (
+                        <CheckCircle className="h-5 w-5 text-green-500" />
                       ) : (
-                        <li className="flex items-start">
-                          <CheckCircle className="h-4 w-4 mr-1 text-green-500 mt-0.5" />
-                          <span>Perfect score! No improvement needed.</span>
-                        </li>
+                        <XCircle className="h-5 w-5 text-red-500" />
                       )}
-                    </ul>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-            
-            <h3 className="text-xl font-semibold mb-4">Question Review</h3>
-            
-            <div className="space-y-4">
-              {exam.questions.map((question, index) => {
-                const selectedAnswer = submission.answers[index];
-                const isCorrect = selectedAnswer === question.correctAnswer;
-                
-                return (
-                  <Card key={index} className={`border-l-4 ${
-                    isCorrect ? 'border-l-green-500' : 'border-l-red-500'
-                  }`}>
-                    <CardContent className="pt-6">
-                      <div className="flex items-start justify-between">
-                        <div className="space-y-1">
-                          <h4 className="font-medium">Question {index + 1}</h4>
-                          <p>{question.text}</p>
-                        </div>
-                        {isCorrect ? (
-                          <CheckCircle className="text-green-500 h-6 w-6 flex-shrink-0" />
-                        ) : (
-                          <XCircle className="text-red-500 h-6 w-6 flex-shrink-0" />
-                        )}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">Question {qIndex + 1}:</span>
+                        <Badge variant="outline">
+                          {question.type === 'mcq' ? 'Multiple Choice' : 'Fill in the Blank'}
+                        </Badge>
+                      </div>
+                      <p className="mt-1">{question.text}</p>
+                      
+                      <div className="mt-3 space-y-1">
+                        {question.options.map((option, oIndex) => (
+                          <div
+                            key={oIndex}
+                            className={`px-3 py-2 rounded ${
+                              oIndex === question.correctAnswer
+                                ? 'bg-green-100 border-l-4 border-green-500'
+                                : oIndex === selectedAnswer && !isCorrect
+                                ? 'bg-red-100 border-l-4 border-red-500'
+                                : 'bg-gray-50'
+                            }`}
+                          >
+                            <span className="inline-block w-6 font-medium">
+                              {String.fromCharCode(65 + oIndex)}:
+                            </span>
+                            {option}
+                            {oIndex === question.correctAnswer && (
+                              <Badge className="ml-2 bg-green-500">Correct Answer</Badge>
+                            )}
+                            {oIndex === selectedAnswer && !isCorrect && (
+                              <Badge className="ml-2 bg-red-500">Your Answer</Badge>
+                            )}
+                          </div>
+                        ))}
                       </div>
                       
-                      <div className="mt-4 space-y-2">
-                        {question.options.map((option, optIndex) => {
-                          const isSelected = optIndex === selectedAnswer;
-                          const isCorrectOption = optIndex === question.correctAnswer;
-                          
-                          return (
-                            <div 
-                              key={optIndex} 
-                              className={`p-3 rounded-md flex items-center ${
-                                isSelected && isCorrect ? 'bg-green-100' :
-                                isSelected && !isCorrect ? 'bg-red-100' :
-                                isCorrectOption ? 'bg-green-50' : ''
-                              }`}
-                            >
-                              <div className="mr-2">
-                                {isCorrectOption && <CheckCircle className="text-green-500 h-4 w-4" />}
-                                {isSelected && !isCorrect && <XCircle className="text-red-500 h-4 w-4" />}
-                              </div>
-                              <span className="font-medium mr-2">{String.fromCharCode(65 + optIndex)}.</span> 
-                              <span>{option}</span>
-                              {isSelected && (
-                                <Badge className="ml-2" variant="outline">Your answer</Badge>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+                      {!isCorrect && (
+                        <div className="mt-3 p-2 bg-yellow-50 rounded-md flex items-center">
+                          <AlertTriangle className="h-4 w-4 text-yellow-600 mr-2" />
+                          <p className="text-sm text-yellow-700">
+                            You selected "{String.fromCharCode(65 + selectedAnswer)}" but the correct answer was "{String.fromCharCode(65 + question.correctAnswer)}".
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

@@ -1,6 +1,6 @@
 
 import { useState } from 'react';
-import { useData, Question } from '@/contexts/DataContext';
+import { useData, Question, QuestionType } from '@/contexts/DataContext';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -9,6 +9,7 @@ import { toast } from '@/components/ui/sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { Upload, Clock, Settings, Save } from 'lucide-react';
 import QuestionEditor from './QuestionEditor';
+import { Checkbox } from '@/components/ui/checkbox';
 
 export default function ExamCreator() {
   const { user } = useAuth();
@@ -20,6 +21,7 @@ export default function ExamCreator() {
   const [file, setFile] = useState<File | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [numQuestions, setNumQuestions] = useState(5);
+  const [questionTypes, setQuestionTypes] = useState<QuestionType[]>(['mcq', 'fill-in-the-blank']);
   
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -34,6 +36,20 @@ export default function ExamCreator() {
     }
   };
   
+  const handleToggleQuestionType = (type: QuestionType) => {
+    setQuestionTypes(current => {
+      if (current.includes(type)) {
+        // Don't allow removing the last question type
+        if (current.length === 1) {
+          return current;
+        }
+        return current.filter(t => t !== type);
+      } else {
+        return [...current, type];
+      }
+    });
+  };
+  
   const handleGenerateQuestions = async () => {
     if (!file) {
       toast.error('Please upload a PDF file first');
@@ -42,7 +58,7 @@ export default function ExamCreator() {
     
     try {
       setIsGenerating(true);
-      const generatedQuestions = await generateQuestionsFromPdf(file, numQuestions);
+      const generatedQuestions = await generateQuestionsFromPdf(file, numQuestions, questionTypes);
       setQuestions(generatedQuestions);
       toast.success(`Generated ${generatedQuestions.length} questions`);
     } catch (error) {
@@ -139,6 +155,28 @@ export default function ExamCreator() {
           </div>
           
           <div className="space-y-2">
+            <Label>Question Types</Label>
+            <div className="flex flex-wrap gap-4">
+              <div className="flex items-center space-x-2">
+                <Checkbox 
+                  id="mcq-type" 
+                  checked={questionTypes.includes('mcq')}
+                  onCheckedChange={() => handleToggleQuestionType('mcq')}
+                />
+                <Label htmlFor="mcq-type">Multiple Choice Questions</Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox 
+                  id="fitb-type" 
+                  checked={questionTypes.includes('fill-in-the-blank')}
+                  onCheckedChange={() => handleToggleQuestionType('fill-in-the-blank')}
+                />
+                <Label htmlFor="fitb-type">Fill in the Blanks</Label>
+              </div>
+            </div>
+          </div>
+          
+          <div className="space-y-2">
             <Label htmlFor="numQuestions">Number of Questions to Generate</Label>
             <div className="flex space-x-2">
               <Input
@@ -198,4 +236,3 @@ export default function ExamCreator() {
     </div>
   );
 }
-

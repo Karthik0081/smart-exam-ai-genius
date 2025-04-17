@@ -3,11 +3,14 @@ import { createContext, useContext, useState, ReactNode } from 'react';
 import { toast } from '@/components/ui/sonner';
 
 // Define types
+export type QuestionType = 'mcq' | 'fill-in-the-blank';
+
 export type Question = {
   id: string;
   text: string;
+  type: QuestionType;
   options: string[];
-  correctAnswer: number; // Index of the correct answer
+  correctAnswer: number; // Index of the correct answer or correct text for fill-in-the-blank
 };
 
 export type Exam = {
@@ -32,7 +35,7 @@ type DataContextType = {
   exams: Exam[];
   submissions: Submission[];
   createExam: (exam: Omit<Exam, 'id' | 'createdAt'>) => void;
-  generateQuestionsFromPdf: (file: File, numQuestions: number) => Promise<Question[]>;
+  generateQuestionsFromPdf: (file: File, numQuestions: number, questionTypes: QuestionType[]) => Promise<Question[]>;
   submitExam: (examId: string, studentId: string, answers: number[]) => void;
   getExamById: (id: string) => Exam | undefined;
   getSubmissionsByStudent: (studentId: string) => Submission[];
@@ -57,30 +60,35 @@ const sampleQuestions: Question[] = [
   {
     id: '1',
     text: 'What is the capital of France?',
+    type: 'mcq',
     options: ['Berlin', 'Madrid', 'Paris', 'Rome'],
     correctAnswer: 2 // Paris
   },
   {
     id: '2',
     text: 'Which planet is closest to the sun?',
+    type: 'mcq',
     options: ['Venus', 'Earth', 'Mars', 'Mercury'],
     correctAnswer: 3 // Mercury
   },
   {
     id: '3',
     text: 'Who wrote "Romeo and Juliet"?',
+    type: 'mcq',
     options: ['Charles Dickens', 'William Shakespeare', 'Jane Austen', 'Mark Twain'],
     correctAnswer: 1 // William Shakespeare
   },
   {
     id: '4',
     text: 'What is 2 + 2?',
+    type: 'mcq',
     options: ['3', '4', '5', '6'],
     correctAnswer: 1 // 4
   },
   {
     id: '5',
-    text: 'Which element has the chemical symbol "O"?',
+    text: 'The chemical symbol "O" represents __________.',
+    type: 'fill-in-the-blank',
     options: ['Osmium', 'Oxygen', 'Oganesson', 'Olivine'],
     correctAnswer: 1 // Oxygen
   }
@@ -128,24 +136,45 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   };
 
   // Generate questions from PDF (mock implementation)
-  const generateQuestionsFromPdf = async (file: File, numQuestions: number): Promise<Question[]> => {
+  const generateQuestionsFromPdf = async (
+    file: File, 
+    numQuestions: number, 
+    questionTypes: QuestionType[] = ['mcq', 'fill-in-the-blank']
+  ): Promise<Question[]> => {
     // This would be an API call to OpenAI in a real implementation
     return new Promise((resolve) => {
       setTimeout(() => {
-        // Mock generating questions
-        const newQuestions = Array.from({ length: numQuestions }).map((_, index) => ({
-          id: `new-${index + 1}`,
-          text: `Generated question ${index + 1} from ${file.name}?`,
-          options: [
-            `Option A for question ${index + 1}`,
-            `Option B for question ${index + 1}`,
-            `Option C for question ${index + 1}`,
-            `Option D for question ${index + 1}`,
-          ],
-          correctAnswer: Math.floor(Math.random() * 4), // Random correct answer
-        }));
+        // Mock generating questions with mixed types
+        const newQuestions = Array.from({ length: numQuestions }).map((_, index) => {
+          // Decide question type - alternate between MCQ and fill-in-the-blank if both types requested
+          const type = questionTypes.length > 1 
+            ? (index % 2 === 0 ? 'mcq' : 'fill-in-the-blank') 
+            : questionTypes[0];
+          
+          let questionText = '';
+          
+          if (type === 'mcq') {
+            questionText = `Generated MCQ ${index + 1} from ${file.name}?`;
+          } else {
+            // For fill-in-the-blank, include a blank in the question
+            questionText = `Generated sentence ${index + 1} from ${file.name} with a __________.`;
+          }
+          
+          return {
+            id: `new-${index + 1}`,
+            text: questionText,
+            type,
+            options: [
+              `Option A for question ${index + 1}`,
+              `Option B for question ${index + 1}`,
+              `Option C for question ${index + 1}`,
+              `Option D for question ${index + 1}`,
+            ],
+            correctAnswer: Math.floor(Math.random() * 4), // Random correct answer
+          };
+        });
         
-        toast.success(`Generated ${numQuestions} questions`);
+        toast.success(`Generated ${numQuestions} questions (${newQuestions.filter(q => q.type === 'mcq').length} MCQs, ${newQuestions.filter(q => q.type === 'fill-in-the-blank').length} fill-in-the-blank)`);
         resolve(newQuestions);
       }, 2000);
     });

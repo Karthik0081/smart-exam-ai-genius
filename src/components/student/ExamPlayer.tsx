@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useData, Exam } from '@/contexts/DataContext';
+import { useData, Exam, Question } from '@/contexts/DataContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAudio } from '@/contexts/AudioContext';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,6 +12,7 @@ import { Progress } from '@/components/ui/progress';
 import { toast } from '@/components/ui/sonner';
 import { ArrowLeft, ArrowRight, Save, Clock, Volume2, VolumeX, AlertTriangle } from 'lucide-react';
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 
 interface ExamPlayerProps {
   exam: Exam;
@@ -131,7 +132,14 @@ export default function ExamPlayer({ exam }: ExamPlayerProps) {
     if (isSpeaking) {
       stopSpeaking();
     } else {
-      const textToRead = `Question ${currentQuestionIndex + 1}: ${currentQuestion.text}. Options: A: ${currentQuestion.options[0]}. B: ${currentQuestion.options[1]}. C: ${currentQuestion.options[2]}. D: ${currentQuestion.options[3]}`;
+      let textToRead = `Question ${currentQuestionIndex + 1}: ${currentQuestion.text}`;
+      
+      if (currentQuestion.type === 'mcq') {
+        textToRead += `. Options: A: ${currentQuestion.options[0]}. B: ${currentQuestion.options[1]}. C: ${currentQuestion.options[2]}. D: ${currentQuestion.options[3]}`;
+      } else if (currentQuestion.type === 'fill-in-the-blank') {
+        textToRead += `. Fill in the blank with one of the following: A: ${currentQuestion.options[0]}. B: ${currentQuestion.options[1]}. C: ${currentQuestion.options[2]}. D: ${currentQuestion.options[3]}`;
+      }
+      
       speak(textToRead);
     }
   };
@@ -153,6 +161,26 @@ export default function ExamPlayer({ exam }: ExamPlayerProps) {
       </div>
     );
   }
+  
+  // Format the question text for fill-in-the-blank type
+  const formatQuestionText = (question: Question) => {
+    if (question.type !== 'fill-in-the-blank') {
+      return question.text;
+    }
+    
+    // For fill-in-the-blank, highlight the blank
+    return (
+      <div className="text-lg font-medium">
+        {question.text.replace('__________', 
+          <span className="px-2 py-1 mx-1 border-b-2 border-dashed border-gray-500 inline-block min-w-16 text-center">
+            {selectedAnswers[currentQuestionIndex] >= 0 ? 
+              question.options[selectedAnswers[currentQuestionIndex]] : 
+              '________'}
+          </span>
+        )}
+      </div>
+    );
+  };
   
   return (
     <div className="space-y-6">
@@ -178,7 +206,10 @@ export default function ExamPlayer({ exam }: ExamPlayerProps) {
         <CardHeader>
           <div className="flex justify-between items-center">
             <CardTitle className="flex items-center">
-              <span>Question {currentQuestionIndex + 1} of {exam.questions.length}</span>
+              <span>
+                Question {currentQuestionIndex + 1} of {exam.questions.length}
+                {currentQuestion.type === 'mcq' ? ' (Multiple Choice)' : ' (Fill in the Blank)'}
+              </span>
               {flaggedQuestions[currentQuestionIndex] && (
                 <AlertTriangle size={18} className="ml-2 text-yellow-500" />
               )}
@@ -199,7 +230,13 @@ export default function ExamPlayer({ exam }: ExamPlayerProps) {
         </CardHeader>
         <CardContent>
           <div className="space-y-6">
-            <p className="text-lg font-medium">{currentQuestion.text}</p>
+            {currentQuestion.type === 'fill-in-the-blank' ? (
+              <p className="text-lg font-medium">
+                {currentQuestion.text}
+              </p>
+            ) : (
+              <p className="text-lg font-medium">{currentQuestion.text}</p>
+            )}
             
             <RadioGroup 
               value={selectedAnswers[currentQuestionIndex] !== undefined && selectedAnswers[currentQuestionIndex] >= 0 ? 
