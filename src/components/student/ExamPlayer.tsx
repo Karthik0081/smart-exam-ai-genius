@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { useData, Question } from '@/contexts/DataContext';
+import { useNavigate } from 'react-router-dom';
+import { useData, Exam } from '@/contexts/DataContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useAudio } from '@/contexts/AudioContext';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,25 +10,30 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { toast } from '@/components/ui/sonner';
-import { ArrowLeft, ArrowRight, Save, Clock, Volume2, VolumeX } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Save, Clock, Volume2, VolumeX, AlertTriangle } from 'lucide-react';
+import { Checkbox } from "@/components/ui/checkbox";
 
-export default function ExamPlayer() {
-  const { examId } = useParams<{ examId: string }>();
-  const { getExamById, submitExam } = useData();
+interface ExamPlayerProps {
+  exam: Exam;
+}
+
+export default function ExamPlayer({ exam }: ExamPlayerProps) {
+  const { submitExam } = useData();
   const { user } = useAuth();
   const { speak, stopSpeaking, isSpeaking } = useAudio();
   const navigate = useNavigate();
   
-  const [exam, setExam] = useState(examId ? getExamById(examId) : undefined);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswers, setSelectedAnswers] = useState<number[]>([]);
   const [timeRemaining, setTimeRemaining] = useState(exam ? exam.duration * 60 : 0); // in seconds
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [flaggedQuestions, setFlaggedQuestions] = useState<boolean[]>([]);
   
-  // Initialize selected answers array
+  // Initialize selected answers and flagged questions arrays
   useEffect(() => {
     if (exam) {
       setSelectedAnswers(new Array(exam.questions.length).fill(-1));
+      setFlaggedQuestions(new Array(exam.questions.length).fill(false));
       setTimeRemaining(exam.duration * 60);
     }
   }, [exam]);
@@ -59,17 +64,6 @@ export default function ExamPlayer() {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
   
-  if (!exam || !user) {
-    return (
-      <div className="text-center py-12">
-        <p>Exam not found or user not authenticated.</p>
-        <Button className="mt-4" onClick={() => navigate('/student/dashboard')}>
-          Back to Dashboard
-        </Button>
-      </div>
-    );
-  }
-  
   const currentQuestion = exam.questions[currentQuestionIndex];
   const progress = (currentQuestionIndex / exam.questions.length) * 100;
   
@@ -94,11 +88,31 @@ export default function ExamPlayer() {
   };
   
   const handleSubmitExam = () => {
-    if (selectedAnswers.includes(-1)) {
-      const unansweredCount = selectedAnswers.filter(a => a === -1).length;
-      toast.warning(`You have ${unansweredCount} unanswered questions. Are you sure you want to submit?`);
+    if (!user) {
+      toast.error("User authentication error");
       return;
     }
+    
+    if (selectedAnswers.includes(-1)) {
+      const unansweredCount = selectedAnswers.filter(a => a === -1).length;
+      
+      if (timeRemaining > 0) {
+        // Only warn if time hasn't expired
+        toast.warning(`You have ${unansweredCount} unanswered questions. Are you sure you want to submit?`, {
+          action: {
+            label: "Submit Anyway",
+            onClick: () => submitExamConfirmed()
+          }
+        });
+        return;
+      }
+    }
+    
+    submitExamConfirmed();
+  };
+  
+  const submitExamConfirmed = () => {
+    if (!user) return;
     
     setIsSubmitting(true);
     stopSpeaking();
@@ -119,6 +133,12 @@ export default function ExamPlayer() {
     }
   };
   
+  const handleFlagQuestion = () => {
+    const newFlagged = [...flaggedQuestions];
+    newFlagged[currentQuestionIndex] = !newFlagged[currentQuestionIndex];
+    setFlaggedQuestions(newFlagged);
+  };
+  
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -131,7 +151,9 @@ export default function ExamPlayer() {
         
         <div className="flex items-center px-4 py-2 bg-yellow-100 rounded-md">
           <Clock className="mr-2 text-yellow-600" />
-          <span className="font-medium text-yellow-600">Time Remaining: {formatTime(timeRemaining)}</span>
+          <span className={`font-medium ${timeRemaining < 60 ? "text-red-600" : "text-yellow-600"}`}>
+            Time Remaining: {formatTime(timeRemaining)}
+          </span>
         </div>
       </div>
       
@@ -140,12 +162,24 @@ export default function ExamPlayer() {
       <Card className="shadow-md">
         <CardHeader>
           <div className="flex justify-between items-center">
-            <CardTitle>
-              Question {currentQuestionIndex + 1} of {exam.questions.length}
+            <CardTitle className="flex items-center">
+              <span>Question {currentQuestionIndex + 1} of {exam.questions.length}</span>
+              {flaggedQuestions[currentQuestionIndex] && (
+                <AlertTriangle size={18} className="ml-2 text-yellow-500" />
+              )}
             </CardTitle>
-            <Button variant="outline" size="icon" onClick={handleReadQuestion}>
-              {isSpeaking ? <VolumeX /> : <Volume2 />}
-            </Button>
+            <div className="flex gap-2">
+              <Button 
+                variant={flaggedQuestions[currentQuestionIndex] ? "default" : "outline"} 
+                size="sm"
+                onClick={handleFlagQuestion}
+              >
+                {flaggedQuestions[currentQuestionIndex] ? "Unflag" : "Flag for Review"}
+              </Button>
+              <Button variant="outline" size="icon" onClick={handleReadQuestion}>
+                {isSpeaking ? <VolumeX /> : <Volume2 />}
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -200,21 +234,34 @@ export default function ExamPlayer() {
       
       <div className="flex justify-center">
         <div className="flex flex-wrap justify-center gap-2 max-w-xl">
-          {exam.questions.map((_, index) => (
-            <Button
-              key={index}
-              variant={currentQuestionIndex === index ? "default" : selectedAnswers[index] >= 0 ? "outline" : "ghost"}
-              className={`w-10 h-10 p-0 ${
-                selectedAnswers[index] >= 0 ? "border-green-500 text-green-700" : ""
-              }`}
-              onClick={() => {
-                stopSpeaking();
-                setCurrentQuestionIndex(index);
-              }}
-            >
-              {index + 1}
-            </Button>
-          ))}
+          {exam.questions.map((_, index) => {
+            let buttonVariant = "ghost";
+            let buttonClass = "w-10 h-10 p-0";
+            
+            if (currentQuestionIndex === index) {
+              buttonVariant = "default";
+            } else if (flaggedQuestions[index]) {
+              buttonVariant = "outline";
+              buttonClass += " border-yellow-500 text-yellow-700";
+            } else if (selectedAnswers[index] >= 0) {
+              buttonVariant = "outline";
+              buttonClass += " border-green-500 text-green-700";
+            }
+            
+            return (
+              <Button
+                key={index}
+                variant={buttonVariant as any}
+                className={buttonClass}
+                onClick={() => {
+                  stopSpeaking();
+                  setCurrentQuestionIndex(index);
+                }}
+              >
+                {index + 1}
+              </Button>
+            );
+          })}
         </div>
       </div>
     </div>
