@@ -64,8 +64,9 @@ export default function ExamPlayer({ exam }: ExamPlayerProps) {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
   
-  const currentQuestion = exam.questions[currentQuestionIndex];
-  const progress = (currentQuestionIndex / exam.questions.length) * 100;
+  // Safety check to ensure currentQuestion is defined before accessing it
+  const currentQuestion = exam?.questions?.[currentQuestionIndex];
+  const progress = exam?.questions ? (currentQuestionIndex / exam.questions.length) * 100 : 0;
   
   const handleAnswerSelect = (value: string) => {
     const newAnswers = [...selectedAnswers];
@@ -125,6 +126,8 @@ export default function ExamPlayer({ exam }: ExamPlayerProps) {
   };
   
   const handleReadQuestion = () => {
+    if (!currentQuestion) return;
+    
     if (isSpeaking) {
       stopSpeaking();
     } else {
@@ -138,6 +141,18 @@ export default function ExamPlayer({ exam }: ExamPlayerProps) {
     newFlagged[currentQuestionIndex] = !newFlagged[currentQuestionIndex];
     setFlaggedQuestions(newFlagged);
   };
+  
+  // Safety check - if currentQuestion is undefined, show a loading or error state
+  if (!currentQuestion) {
+    return (
+      <div className="space-y-6 text-center py-12">
+        <p>Loading exam question...</p>
+        <Button variant="outline" onClick={() => navigate('/student/dashboard')}>
+          Return to Dashboard
+        </Button>
+      </div>
+    );
+  }
   
   return (
     <div className="space-y-6">
@@ -187,7 +202,8 @@ export default function ExamPlayer({ exam }: ExamPlayerProps) {
             <p className="text-lg font-medium">{currentQuestion.text}</p>
             
             <RadioGroup 
-              value={selectedAnswers[currentQuestionIndex].toString()} 
+              value={selectedAnswers[currentQuestionIndex] !== undefined && selectedAnswers[currentQuestionIndex] >= 0 ? 
+                selectedAnswers[currentQuestionIndex].toString() : undefined} 
               onValueChange={handleAnswerSelect}
               className="space-y-3"
             >

@@ -62,7 +62,7 @@ export default function StudentResults({ exam, submission }: StudentResultsProps
     // Calculate average time per question based on exam duration
     const totalTimeInSeconds = exam.duration * 60;
     const avgTimePerQuestion = totalTimeInSeconds / exam.questions.length;
-    setTimePerQuestion(avgTimeInSeconds);
+    setTimePerQuestion(avgTimePerQuestion);
   }, [exam]);
   
   // Chart data
