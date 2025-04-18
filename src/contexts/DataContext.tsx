@@ -1,3 +1,4 @@
+
 import { createContext, useContext, useState, ReactNode } from 'react';
 import { toast } from '@/components/ui/sonner';
 
@@ -40,6 +41,7 @@ type DataContextType = {
   getSubmissionsByStudent: (studentId: string) => Submission[];
   getSubmissionsByExam: (examId: string) => Submission[];
   getStudentSubmissionForExam: (studentId: string, examId: string) => Submission | undefined;
+  extractTextFromPdf: (file: File) => Promise<string>;
 };
 
 // Create context
@@ -134,55 +136,130 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     toast.success('Exam created successfully');
   };
 
-  // Generate questions from PDF (mock implementation)
+  // Extract text from PDF (mock implementation)
+  const extractTextFromPdf = async (file: File): Promise<string> => {
+    return new Promise((resolve) => {
+      // In a real implementation, we would use a PDF parsing library
+      // For demo purposes, we'll simulate extracting text after a delay
+      setTimeout(() => {
+        // Mock text content from PDF
+        const mockPdfContent = `
+          Learning Document: Advanced Concepts
+          
+          Section 1: Introduction to Machine Learning
+          Machine learning is a method of data analysis that automates analytical model building. 
+          The process of learning begins with observations or data, such as examples, direct experience, 
+          or instruction, in order to look for patterns in data and make better decisions in the future.
+          
+          Section 2: Types of Machine Learning Algorithms
+          There are three main types of machine learning algorithms: supervised learning, unsupervised learning, 
+          and reinforcement learning. Supervised learning uses labeled data, while unsupervised learning 
+          finds patterns in unlabeled data.
+          
+          Section 3: Neural Networks
+          Neural networks are computing systems inspired by the biological neural networks that constitute 
+          animal brains. The connections between neurons carry signals in the form of mathematical functions.
+          
+          Section 4: Data Preprocessing
+          Data preprocessing is a crucial step in machine learning that involves transforming raw data into 
+          a clean dataset. The process includes cleaning, normalization, transformation, feature extraction, 
+          and selection.
+          
+          Section 5: Model Evaluation
+          Model evaluation is the process of using different metrics to understand how well your model 
+          is performing. Common metrics include accuracy, precision, recall, and F1-score.
+        `;
+        
+        resolve(mockPdfContent);
+      }, 1500);
+    });
+  };
+
+  // Generate questions from PDF
   const generateQuestionsFromPdf = async (
     file: File,
     numQuestions: number,
     questionTypes: QuestionType[]
   ): Promise<Question[]> => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        const questions: Question[] = [];
-        
-        // Generate questions based on selected types
-        for (let i = 0; i < numQuestions; i++) {
-          const type = questionTypes[i % questionTypes.length];
-          const questionId = `gen-${Date.now()}-${i}`;
+    try {
+      // First extract text from PDF
+      const pdfText = await extractTextFromPdf(file);
+      
+      // Now generate questions based on the extracted text
+      return new Promise((resolve) => {
+        setTimeout(() => {
+          const questions: Question[] = [];
           
-          if (type === 'mcq') {
-            questions.push({
-              id: questionId,
-              text: `Based on the content from ${file.name}, what is the main concept discussed in section ${i + 1}?`,
-              type: 'mcq',
-              options: [
-                `Concept A from section ${i + 1}`,
-                `Concept B from section ${i + 1}`,
-                `Concept C from section ${i + 1}`,
-                `Concept D from section ${i + 1}`,
-              ],
-              correctAnswer: Math.floor(Math.random() * 4),
-            });
-          } else {
-            // Fill in the blank question
-            questions.push({
-              id: questionId,
-              text: `According to the document, the process of __________ is a key component in section ${i + 1}.`,
-              type: 'fill-in-the-blank',
-              options: [
-                `Process ${i + 1}A`,
-                `Process ${i + 1}B`,
-                `Process ${i + 1}C`,
-                `Process ${i + 1}D`,
-              ],
-              correctAnswer: Math.floor(Math.random() * 4),
-            });
+          // Extract sections from the PDF text
+          const sections = pdfText.split(/Section \d+:/g).filter(Boolean);
+          
+          // Generate questions based on selected types
+          for (let i = 0; i < numQuestions; i++) {
+            const type = questionTypes[i % questionTypes.length];
+            const questionId = `gen-${Date.now()}-${i}`;
+            const sectionIndex = i % sections.length;
+            const section = sections[sectionIndex].trim();
+            const sectionTitle = section.split('\n')[0].trim();
+            
+            if (type === 'mcq') {
+              // Extract keywords for options
+              const words = section
+                .split(/\s+/)
+                .filter(word => word.length > 5)
+                .filter((_, idx) => idx % 7 === 0)
+                .slice(0, 4);
+              
+              // If we don't have enough words, add some generic options
+              while (words.length < 4) {
+                words.push(`Option ${words.length + 1}`);
+              }
+              
+              questions.push({
+                id: questionId,
+                text: `Based on the content about ${sectionTitle}, which concept is most important?`,
+                type: 'mcq',
+                options: words,
+                correctAnswer: Math.floor(Math.random() * 4),
+              });
+            } else {
+              // Find a suitable word to blank out
+              const sentences = section.split(/[.!?]+/).filter(s => s.trim().length > 10);
+              let sentence = sentences[Math.floor(Math.random() * sentences.length)] || section;
+              
+              // Extract keywords for the blank
+              const words = sentence
+                .split(/\s+/)
+                .filter(word => word.length > 5)
+                .slice(0, 4);
+              
+              // If we don't have enough words, add some generic options
+              while (words.length < 4) {
+                words.push(`Term ${words.length + 1}`);
+              }
+              
+              // Select a word to blank out
+              const blankWord = words[0];
+              const blankSentence = sentence.replace(blankWord, '__________');
+              
+              questions.push({
+                id: questionId,
+                text: blankSentence,
+                type: 'fill-in-the-blank',
+                options: words,
+                correctAnswer: 0, // First option is correct (the blanked word)
+              });
+            }
           }
-        }
-        
-        toast.success(`Generated ${questions.length} questions from ${file.name}`);
-        resolve(questions);
-      }, 1500); // Simulate API delay
-    });
+          
+          toast.success(`Generated ${questions.length} questions from ${file.name}`);
+          resolve(questions);
+        }, 1500); // Simulate API delay
+      });
+    } catch (error) {
+      console.error('Error generating questions:', error);
+      toast.error('Failed to generate questions from PDF');
+      return [];
+    }
   };
 
   // Submit exam
@@ -242,6 +319,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     getSubmissionsByStudent,
     getSubmissionsByExam,
     getStudentSubmissionForExam,
+    extractTextFromPdf,
   };
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;

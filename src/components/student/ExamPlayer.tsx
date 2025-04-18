@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useData, Exam, Question } from '@/contexts/DataContext';
@@ -9,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { toast } from '@/components/ui/sonner';
-import { ArrowLeft, ArrowRight, Save, Clock, Volume2, VolumeX, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Save, Clock, Volume2, VolumeX, AlertTriangle, Mic, MicOff } from 'lucide-react';
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 
@@ -28,6 +29,11 @@ export default function ExamPlayer({ exam }: ExamPlayerProps) {
   const [timeRemaining, setTimeRemaining] = useState(exam ? exam.duration * 60 : 0); // in seconds
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [flaggedQuestions, setFlaggedQuestions] = useState<boolean[]>([]);
+  const [isListening, setIsListening] = useState(false);
+  const [transcript, setTranscript] = useState('');
+  
+  // Initialize Web Speech API
+  const [recognition, setRecognition] = useState<SpeechRecognition | null>(null);
   
   // Initialize selected answers and flagged questions arrays
   useEffect(() => {
@@ -36,7 +42,86 @@ export default function ExamPlayer({ exam }: ExamPlayerProps) {
       setFlaggedQuestions(new Array(exam.questions.length).fill(false));
       setTimeRemaining(exam.duration * 60);
     }
+    
+    // Initialize speech recognition
+    if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const recognition = new SpeechRecognition();
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.lang = 'en-US';
+      
+      recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript.toLowerCase();
+        setTranscript(transcript);
+        processVoiceCommand(transcript);
+      };
+      
+      recognition.onend = () => {
+        setIsListening(false);
+      };
+      
+      setRecognition(recognition);
+    }
   }, [exam]);
+  
+  // Process voice commands
+  const processVoiceCommand = (command: string) => {
+    if (!currentQuestion) return;
+    
+    // Check if the command is to select an option
+    if (/select option [a-d]/.test(command) || /choose [a-d]/.test(command)) {
+      const optionMatch = command.match(/[a-d]$/);
+      if (optionMatch) {
+        const optionChar = optionMatch[0];
+        const optionIndex = optionChar.charCodeAt(0) - 'a'.charCodeAt(0);
+        if (optionIndex >= 0 && optionIndex < currentQuestion.options.length) {
+          handleAnswerSelect(optionIndex.toString());
+          speak(`Selected option ${optionChar.toUpperCase()}`);
+        }
+      }
+    }
+    // Navigation commands
+    else if (command.includes('next question')) {
+      handleNext();
+    }
+    else if (command.includes('previous question')) {
+      handlePrevious();
+    }
+    else if (command.includes('submit exam')) {
+      handleSubmitExam();
+    }
+    // Help command
+    else if (command.includes('help') || command.includes('what can i say')) {
+      const helpText = "You can say: 'select option A', 'next question', 'previous question', 'read question', or 'submit exam'";
+      speak(helpText);
+    }
+    // Read question command
+    else if (command.includes('read question') || command.includes('read the question')) {
+      handleReadQuestion();
+    }
+    else {
+      speak("Sorry, I didn't understand that command. Try saying help for available commands.");
+    }
+  };
+  
+  // Toggle speech recognition
+  const toggleListening = () => {
+    if (!recognition) {
+      toast.error('Speech recognition is not supported in this browser');
+      return;
+    }
+    
+    if (isListening) {
+      recognition.stop();
+      setIsListening(false);
+    } else {
+      stopSpeaking();
+      setTranscript('');
+      recognition.start();
+      setIsListening(true);
+    }
+  };
   
   // Timer countdown
   useEffect(() => {
@@ -224,17 +309,33 @@ export default function ExamPlayer({ exam }: ExamPlayerProps) {
               <Button variant="outline" size="icon" onClick={handleReadQuestion}>
                 {isSpeaking ? <VolumeX /> : <Volume2 />}
               </Button>
+              <Button 
+                variant="outline" 
+                size="icon" 
+                onClick={toggleListening}
+                className={isListening ? "bg-red-100" : ""}
+              >
+                {isListening ? <MicOff /> : <Mic />}
+              </Button>
             </div>
           </div>
         </CardHeader>
         <CardContent>
           <div className="space-y-6">
-            {currentQuestion.type === 'fill-in-the-blank' ? (
-              <p className="text-lg font-medium">
-                {currentQuestion.text}
-              </p>
-            ) : (
-              <p className="text-lg font-medium">{currentQuestion.text}</p>
+            <p className="text-lg font-medium">
+              {formatQuestionText(currentQuestion)}
+            </p>
+            
+            {isListening && (
+              <div className="p-2 bg-blue-50 rounded-md text-sm text-blue-800 animate-pulse">
+                Listening... Say "help" for available commands
+              </div>
+            )}
+            
+            {transcript && (
+              <div className="p-2 bg-gray-50 rounded-md text-sm text-gray-600">
+                You said: "{transcript}"
+              </div>
             )}
             
             <RadioGroup 
