@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useData, Exam, Question } from '@/contexts/DataContext';
@@ -168,17 +167,17 @@ export default function ExamPlayer({ exam }: ExamPlayerProps) {
       return question.text;
     }
     
-    // For fill-in-the-blank, highlight the blank
+    const parts = question.text.split('__________');
     return (
-      <div className="text-lg font-medium">
-        {question.text.replace('__________', 
-          <span className="px-2 py-1 mx-1 border-b-2 border-dashed border-gray-500 inline-block min-w-16 text-center">
-            {selectedAnswers[currentQuestionIndex] >= 0 ? 
-              question.options[selectedAnswers[currentQuestionIndex]] : 
-              '________'}
-          </span>
-        )}
-      </div>
+      <>
+        {parts[0]}
+        <span className="px-2 py-1 mx-1 border-b-2 border-dashed border-gray-500 inline-block min-w-16 text-center">
+          {selectedAnswers[currentQuestionIndex] >= 0 ? 
+            question.options[selectedAnswers[currentQuestionIndex]] : 
+            '________'}
+        </span>
+        {parts[1]}
+      </>
     );
   };
   

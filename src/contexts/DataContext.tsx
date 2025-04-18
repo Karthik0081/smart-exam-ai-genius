@@ -1,4 +1,3 @@
-
 import { createContext, useContext, useState, ReactNode } from 'react';
 import { toast } from '@/components/ui/sonner';
 
@@ -137,46 +136,52 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
   // Generate questions from PDF (mock implementation)
   const generateQuestionsFromPdf = async (
-    file: File, 
-    numQuestions: number, 
-    questionTypes: QuestionType[] = ['mcq', 'fill-in-the-blank']
+    file: File,
+    numQuestions: number,
+    questionTypes: QuestionType[]
   ): Promise<Question[]> => {
-    // This would be an API call to OpenAI in a real implementation
     return new Promise((resolve) => {
       setTimeout(() => {
-        // Mock generating questions with mixed types
-        const newQuestions = Array.from({ length: numQuestions }).map((_, index) => {
-          // Decide question type - alternate between MCQ and fill-in-the-blank if both types requested
-          const type = questionTypes.length > 1 
-            ? (index % 2 === 0 ? 'mcq' : 'fill-in-the-blank') 
-            : questionTypes[0];
-          
-          let questionText = '';
+        const questions: Question[] = [];
+        
+        // Generate questions based on selected types
+        for (let i = 0; i < numQuestions; i++) {
+          const type = questionTypes[i % questionTypes.length];
+          const questionId = `gen-${Date.now()}-${i}`;
           
           if (type === 'mcq') {
-            questionText = `Generated MCQ ${index + 1} from ${file.name}?`;
+            questions.push({
+              id: questionId,
+              text: `Based on the content from ${file.name}, what is the main concept discussed in section ${i + 1}?`,
+              type: 'mcq',
+              options: [
+                `Concept A from section ${i + 1}`,
+                `Concept B from section ${i + 1}`,
+                `Concept C from section ${i + 1}`,
+                `Concept D from section ${i + 1}`,
+              ],
+              correctAnswer: Math.floor(Math.random() * 4),
+            });
           } else {
-            // For fill-in-the-blank, include a blank in the question
-            questionText = `Generated sentence ${index + 1} from ${file.name} with a __________.`;
+            // Fill in the blank question
+            questions.push({
+              id: questionId,
+              text: `According to the document, the process of __________ is a key component in section ${i + 1}.`,
+              type: 'fill-in-the-blank',
+              options: [
+                `Process ${i + 1}A`,
+                `Process ${i + 1}B`,
+                `Process ${i + 1}C`,
+                `Process ${i + 1}D`,
+              ],
+              correctAnswer: Math.floor(Math.random() * 4),
+            });
           }
-          
-          return {
-            id: `new-${index + 1}`,
-            text: questionText,
-            type,
-            options: [
-              `Option A for question ${index + 1}`,
-              `Option B for question ${index + 1}`,
-              `Option C for question ${index + 1}`,
-              `Option D for question ${index + 1}`,
-            ],
-            correctAnswer: Math.floor(Math.random() * 4), // Random correct answer
-          };
-        });
+        }
         
-        toast.success(`Generated ${numQuestions} questions (${newQuestions.filter(q => q.type === 'mcq').length} MCQs, ${newQuestions.filter(q => q.type === 'fill-in-the-blank').length} fill-in-the-blank)`);
-        resolve(newQuestions);
-      }, 2000);
+        toast.success(`Generated ${questions.length} questions from ${file.name}`);
+        resolve(questions);
+      }, 1500); // Simulate API delay
     });
   };
 
