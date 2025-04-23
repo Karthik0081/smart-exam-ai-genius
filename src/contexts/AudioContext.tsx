@@ -1,5 +1,5 @@
 
-import { createContext, useContext, useState, ReactNode, useEffect } from 'react';
+import { createContext, useContext, useState, ReactNode, useEffect, useRef } from 'react';
 
 type AudioContextType = {
   speak: (text: string) => void;
@@ -12,6 +12,11 @@ type AudioContextType = {
   setRate: (rate: number) => void;
   pitch: number;
   setPitch: (pitch: number) => void;
+  volume: number;
+  setVolume: (volume: number) => void;
+  pauseSpeaking: () => void;
+  resumeSpeaking: () => void;
+  isPaused: boolean;
 };
 
 const AudioContext = createContext<AudioContextType | null>(null);
@@ -26,10 +31,15 @@ export const useAudio = () => {
 
 export const AudioProvider = ({ children }: { children: ReactNode }) => {
   const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
   const [voiceOptions, setVoiceOptions] = useState<SpeechSynthesisVoice[]>([]);
   const [currentVoice, setCurrentVoice] = useState<SpeechSynthesisVoice | null>(null);
   const [rate, setRate] = useState(1.0);
   const [pitch, setPitch] = useState(1.0);
+  const [volume, setVolume] = useState(1.0);
+  
+  // Reference to current utterance
+  const utteranceRef = useRef<SpeechSynthesisUtterance | null>(null);
   
   // Initialize speech synthesis voices
   useEffect(() => {
@@ -74,6 +84,7 @@ export const AudioProvider = ({ children }: { children: ReactNode }) => {
       
       // Create new speech synthesis utterance
       const utterance = new SpeechSynthesisUtterance(text);
+      utteranceRef.current = utterance;
       
       // Set voice if available
       if (currentVoice) {
@@ -83,11 +94,25 @@ export const AudioProvider = ({ children }: { children: ReactNode }) => {
       // Set speech parameters
       utterance.rate = rate;
       utterance.pitch = pitch;
+      utterance.volume = volume;
       
       // Add event listeners
-      utterance.onstart = () => setIsSpeaking(true);
-      utterance.onend = () => setIsSpeaking(false);
-      utterance.onerror = () => setIsSpeaking(false);
+      utterance.onstart = () => {
+        setIsSpeaking(true);
+        setIsPaused(false);
+      };
+      
+      utterance.onend = () => {
+        setIsSpeaking(false);
+        setIsPaused(false);
+        utteranceRef.current = null;
+      };
+      
+      utterance.onerror = () => {
+        setIsSpeaking(false);
+        setIsPaused(false);
+        utteranceRef.current = null;
+      };
       
       // Start speaking
       window.speechSynthesis.speak(utterance);
@@ -101,6 +126,24 @@ export const AudioProvider = ({ children }: { children: ReactNode }) => {
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel();
       setIsSpeaking(false);
+      setIsPaused(false);
+      utteranceRef.current = null;
+    }
+  };
+
+  // Function to pause speaking
+  const pauseSpeaking = () => {
+    if ('speechSynthesis' in window && isSpeaking && !isPaused) {
+      window.speechSynthesis.pause();
+      setIsPaused(true);
+    }
+  };
+
+  // Function to resume speaking
+  const resumeSpeaking = () => {
+    if ('speechSynthesis' in window && isSpeaking && isPaused) {
+      window.speechSynthesis.resume();
+      setIsPaused(false);
     }
   };
   
@@ -114,7 +157,12 @@ export const AudioProvider = ({ children }: { children: ReactNode }) => {
     rate,
     setRate,
     pitch,
-    setPitch
+    setPitch,
+    volume,
+    setVolume,
+    pauseSpeaking,
+    resumeSpeaking,
+    isPaused
   };
   
   return <AudioContext.Provider value={value}>{children}</AudioContext.Provider>;

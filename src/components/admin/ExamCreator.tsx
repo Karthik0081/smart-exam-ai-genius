@@ -7,9 +7,10 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/sonner';
 import { useAuth } from '@/contexts/AuthContext';
-import { Upload, Clock, Settings, Save } from 'lucide-react';
+import { Upload, Clock, Save } from 'lucide-react';
 import QuestionEditor from './QuestionEditor';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Progress } from '@/components/ui/progress';
 
 export default function ExamCreator() {
   const { user } = useAuth();
@@ -22,6 +23,7 @@ export default function ExamCreator() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [numQuestions, setNumQuestions] = useState(5);
   const [questionTypes, setQuestionTypes] = useState<QuestionType[]>(['mcq', 'fill-in-the-blank']);
+  const [generationProgress, setGenerationProgress] = useState(0);
   
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -29,6 +31,7 @@ export default function ExamCreator() {
       // Check if file is a PDF
       if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
         setFile(file);
+        toast.success(`File "${file.name}" selected`);
       } else {
         toast.error('Please upload a PDF file');
         e.target.value = '';
@@ -58,14 +61,27 @@ export default function ExamCreator() {
     
     try {
       setIsGenerating(true);
+      setGenerationProgress(10);
+      
+      // Simulate a phased process for better UX feedback
+      setTimeout(() => setGenerationProgress(30), 500);
+      setTimeout(() => setGenerationProgress(50), 1000);
+      
       const generatedQuestions = await generateQuestionsFromPdf(file, numQuestions, questionTypes);
-      setQuestions(generatedQuestions);
-      toast.success(`Generated ${generatedQuestions.length} questions`);
+      
+      setGenerationProgress(90);
+      setTimeout(() => {
+        setQuestions(generatedQuestions);
+        setGenerationProgress(100);
+        toast.success(`Generated ${generatedQuestions.length} questions`);
+        setIsGenerating(false);
+      }, 500);
+      
     } catch (error) {
       console.error(error);
       toast.error('Failed to generate questions');
-    } finally {
       setIsGenerating(false);
+      setGenerationProgress(0);
     }
   };
   
@@ -115,7 +131,7 @@ export default function ExamCreator() {
       <Card>
         <CardHeader>
           <CardTitle>Create New Exam</CardTitle>
-          <CardDescription>Upload a PDF and generate questions or create them manually</CardDescription>
+          <CardDescription>Upload a PDF and generate AI-powered questions</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
@@ -151,7 +167,21 @@ export default function ExamCreator() {
                 className="flex-1"
               />
             </div>
-            {file && <p className="text-sm text-gray-500">Selected: {file.name}</p>}
+            {file && (
+              <div className="flex items-center">
+                <div className="text-sm text-gray-500 flex-1">Selected: {file.name}</div>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => {
+                    setFile(null);
+                    toast.info("File selection cleared");
+                  }}
+                >
+                  Clear
+                </Button>
+              </div>
+            )}
           </div>
           
           <div className="space-y-2">
@@ -206,6 +236,18 @@ export default function ExamCreator() {
                 )}
               </Button>
             </div>
+            
+            {isGenerating && (
+              <div className="mt-2 space-y-1">
+                <Progress value={generationProgress} className="h-2" />
+                <p className="text-xs text-gray-500 text-center">
+                  {generationProgress < 30 && "Analyzing PDF content..."}
+                  {generationProgress >= 30 && generationProgress < 60 && "Extracting key topics..."}
+                  {generationProgress >= 60 && generationProgress < 90 && "Generating questions..."}
+                  {generationProgress >= 90 && "Finalizing..."}
+                </p>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>

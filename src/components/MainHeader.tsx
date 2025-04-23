@@ -2,7 +2,7 @@
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { BookOpen, LogOut, User } from 'lucide-react';
+import { LogOut, User } from 'lucide-react';
 
 export default function MainHeader() {
   const { user, logout } = useAuth();
@@ -14,11 +14,15 @@ export default function MainHeader() {
   };
   
   return (
-    <header className="bg-smartex-blue text-white py-4">
+    <header className="bg-gradient-to-r from-teal-600 to-orange-500 text-white py-4 shadow-md">
       <div className="container mx-auto px-4 flex items-center justify-between">
-        <div className="flex items-center">
-          <BookOpen size={32} className="mr-2" />
-          <h1 className="text-2xl font-bold">SmartEx</h1>
+        <div className="flex items-center" onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>
+          <img 
+            src="/lovable-uploads/98b874c2-2ad6-42b6-9a71-dac71dbfe746.png" 
+            alt="KMIT Logo" 
+            className="h-12 mr-3" 
+          />
+          <h1 className="text-2xl font-bold">SmartEx AI</h1>
         </div>
         
         {user && (
@@ -31,7 +35,7 @@ export default function MainHeader() {
             </div>
             <Button 
               variant="ghost" 
-              className="text-white hover:bg-blue-700" 
+              className="text-white hover:bg-white/20" 
               onClick={handleLogout}
             >
               <LogOut size={18} className="mr-1" /> Logout
