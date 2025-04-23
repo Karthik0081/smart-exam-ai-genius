@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useData, Question, QuestionType } from '@/contexts/DataContext';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -7,14 +6,15 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/sonner';
 import { useAuth } from '@/contexts/AuthContext';
-import { Upload, Clock, Save } from 'lucide-react';
+import { Upload, Clock, Save, Loader2 } from 'lucide-react';
 import QuestionEditor from './QuestionEditor';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
+import React from 'react';
 
 export default function ExamCreator() {
   const { user } = useAuth();
-  const { createExam, generateQuestionsFromPdf } = useData();
+  const { createExam, generateQuestionsFromPdf, extractTextFromPdf } = useData();
   
   const [title, setTitle] = useState('');
   const [duration, setDuration] = useState(30);
@@ -24,11 +24,16 @@ export default function ExamCreator() {
   const [numQuestions, setNumQuestions] = useState(5);
   const [questionTypes, setQuestionTypes] = useState<QuestionType[]>(['mcq', 'fill-in-the-blank']);
   const [generationProgress, setGenerationProgress] = useState(0);
-  
+
+  const mcqPrompt = (
+    <div className="p-4 bg-blue-100 border border-blue-400 rounded mb-4 text-blue-800">
+      <strong>How it works:</strong> When you upload a PDF and click "Generate Questions", the document will be analyzed by AI. Key topics will be extracted and a set of MCQs will be automatically generated. You can review and edit each question below before publishing. The generated questions will then be visible to students when this exam is created.
+    </div>
+  );
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const file = e.target.files[0];
-      // Check if file is a PDF
       if (file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')) {
         setFile(file);
         toast.success(`File "${file.name}" selected`);
@@ -42,7 +47,6 @@ export default function ExamCreator() {
   const handleToggleQuestionType = (type: QuestionType) => {
     setQuestionTypes(current => {
       if (current.includes(type)) {
-        // Don't allow removing the last question type
         if (current.length === 1) {
           return current;
         }
@@ -52,31 +56,53 @@ export default function ExamCreator() {
       }
     });
   };
-  
+
   const handleGenerateQuestions = async () => {
     if (!file) {
       toast.error('Please upload a PDF file first');
       return;
     }
     
+    setIsGenerating(true);
+    setGenerationProgress(10);
+
     try {
-      setIsGenerating(true);
-      setGenerationProgress(10);
-      
-      // Simulate a phased process for better UX feedback
-      setTimeout(() => setGenerationProgress(30), 500);
-      setTimeout(() => setGenerationProgress(50), 1000);
-      
-      const generatedQuestions = await generateQuestionsFromPdf(file, numQuestions, questionTypes);
-      
-      setGenerationProgress(90);
+      setGenerationProgress(30);
+      const pdfText = await extractTextFromPdf(file);
+
+      setGenerationProgress(50);
+      const topicsRes = await fetch("/api/extract-topics", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: pdfText, numTopics: numQuestions })
+      });
+      const topics = await topicsRes.json();
+
+      setGenerationProgress(70);
+      const questions = await Promise.all(topics.map((topic: any, i: number) =>
+        fetch("/api/generate-mcq", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ topic }),
+        }).then(res => res.json())
+      ));
+
+      const generatedQuestions: Question[] = questions.map((mcq: any, idx: number) => ({
+        id: `pdf-q-${Date.now()}-${idx}`,
+        text: mcq.question || 'Auto-generated question',
+        type: 'mcq' as QuestionType,
+        options: Array.isArray(mcq.options) ? mcq.options : [],
+        correctAnswer: (typeof mcq.correctAnswer === 'number') ? mcq.correctAnswer : 0,
+      }));
+
+      setGenerationProgress(100);
       setTimeout(() => {
         setQuestions(generatedQuestions);
-        setGenerationProgress(100);
         toast.success(`Generated ${generatedQuestions.length} questions`);
         setIsGenerating(false);
+        setGenerationProgress(0);
       }, 500);
-      
+
     } catch (error) {
       console.error(error);
       toast.error('Failed to generate questions');
@@ -90,30 +116,24 @@ export default function ExamCreator() {
       toast.error('Please enter an exam title');
       return;
     }
-    
     if (duration < 5) {
       toast.error('Exam duration must be at least 5 minutes');
       return;
     }
-    
     if (questions.length === 0) {
       toast.error('Please generate or add questions');
       return;
     }
-    
     if (!user) {
       toast.error('You must be logged in to create an exam');
       return;
     }
-    
     createExam({
       title,
       duration,
       questions,
       createdBy: user.id,
     });
-    
-    // Reset form
     setTitle('');
     setDuration(30);
     setQuestions([]);
@@ -134,6 +154,8 @@ export default function ExamCreator() {
           <CardDescription>Upload a PDF and generate AI-powered questions</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {mcqPrompt}
+
           <div className="space-y-2">
             <Label htmlFor="title">Exam Title</Label>
             <Input
@@ -225,7 +247,7 @@ export default function ExamCreator() {
               >
                 {isGenerating ? (
                   <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    <Loader2 className="animate-spin mr-2" size={16} />
                     Generating...
                   </>
                 ) : (
