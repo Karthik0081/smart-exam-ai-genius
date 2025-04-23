@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useData, Exam, Question } from '@/contexts/DataContext';
@@ -32,10 +31,8 @@ export default function ExamPlayer({ exam }: ExamPlayerProps) {
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
   
-  // Initialize Web Speech API
   const [recognition, setRecognition] = useState<SpeechRecognition | null>(null);
   
-  // Initialize selected answers and flagged questions arrays
   useEffect(() => {
     if (exam) {
       setSelectedAnswers(new Array(exam.questions.length).fill(-1));
@@ -43,7 +40,6 @@ export default function ExamPlayer({ exam }: ExamPlayerProps) {
       setTimeRemaining(exam.duration * 60);
     }
     
-    // Initialize speech recognition
     if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       const recognition = new SpeechRecognition();
@@ -65,11 +61,9 @@ export default function ExamPlayer({ exam }: ExamPlayerProps) {
     }
   }, [exam]);
   
-  // Process voice commands
   const processVoiceCommand = (command: string) => {
     if (!currentQuestion) return;
     
-    // Check if the command is to select an option
     if (/select option [a-d]/.test(command) || /choose [a-d]/.test(command)) {
       const optionMatch = command.match(/[a-d]$/);
       if (optionMatch) {
@@ -78,10 +72,14 @@ export default function ExamPlayer({ exam }: ExamPlayerProps) {
         if (optionIndex >= 0 && optionIndex < currentQuestion.options.length) {
           handleAnswerSelect(optionIndex.toString());
           speak(`Selected option ${optionChar.toUpperCase()}`);
+          setTimeout(() => {
+            if (currentQuestionIndex < exam.questions.length - 1) {
+              setCurrentQuestionIndex(currentQuestionIndex + 1);
+            }
+          }, 650);
         }
       }
     }
-    // Navigation commands
     else if (command.includes('next question')) {
       handleNext();
     }
@@ -91,12 +89,10 @@ export default function ExamPlayer({ exam }: ExamPlayerProps) {
     else if (command.includes('submit exam')) {
       handleSubmitExam();
     }
-    // Help command
     else if (command.includes('help') || command.includes('what can i say')) {
       const helpText = "You can say: 'select option A', 'next question', 'previous question', 'read question', or 'submit exam'";
       speak(helpText);
     }
-    // Read question command
     else if (command.includes('read question') || command.includes('read the question')) {
       handleReadQuestion();
     }
@@ -105,7 +101,6 @@ export default function ExamPlayer({ exam }: ExamPlayerProps) {
     }
   };
   
-  // Toggle speech recognition
   const toggleListening = () => {
     if (!recognition) {
       toast.error('Speech recognition is not supported in this browser');
@@ -123,7 +118,6 @@ export default function ExamPlayer({ exam }: ExamPlayerProps) {
     }
   };
   
-  // Timer countdown
   useEffect(() => {
     if (!timeRemaining) return;
     
@@ -131,7 +125,6 @@ export default function ExamPlayer({ exam }: ExamPlayerProps) {
       setTimeRemaining((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
-          // Auto-submit when time is up
           handleSubmitExam();
           return 0;
         }
@@ -142,14 +135,12 @@ export default function ExamPlayer({ exam }: ExamPlayerProps) {
     return () => clearInterval(timer);
   }, [timeRemaining]);
   
-  // Format time remaining
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
   
-  // Safety check to ensure currentQuestion is defined before accessing it
   const currentQuestion = exam?.questions?.[currentQuestionIndex];
   const progress = exam?.questions ? (currentQuestionIndex / exam.questions.length) * 100 : 0;
   
@@ -183,7 +174,6 @@ export default function ExamPlayer({ exam }: ExamPlayerProps) {
       const unansweredCount = selectedAnswers.filter(a => a === -1).length;
       
       if (timeRemaining > 0) {
-        // Only warn if time hasn't expired
         toast.warning(`You have ${unansweredCount} unanswered questions. Are you sure you want to submit?`, {
           action: {
             label: "Submit Anyway",
@@ -203,10 +193,8 @@ export default function ExamPlayer({ exam }: ExamPlayerProps) {
     setIsSubmitting(true);
     stopSpeaking();
     
-    // Submit exam
     submitExam(exam.id, user.id, selectedAnswers);
     
-    // Redirect to results page
     navigate(`/student/results/${exam.id}`);
   };
   
@@ -234,7 +222,6 @@ export default function ExamPlayer({ exam }: ExamPlayerProps) {
     setFlaggedQuestions(newFlagged);
   };
   
-  // Safety check - if currentQuestion is undefined, show a loading or error state
   if (!currentQuestion) {
     return (
       <div className="space-y-6 text-center py-12">
@@ -246,7 +233,6 @@ export default function ExamPlayer({ exam }: ExamPlayerProps) {
     );
   }
   
-  // Format the question text for fill-in-the-blank type
   const formatQuestionText = (question: Question) => {
     if (question.type !== 'fill-in-the-blank') {
       return question.text;
