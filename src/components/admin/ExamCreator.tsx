@@ -24,10 +24,18 @@ export default function ExamCreator() {
   const [numQuestions, setNumQuestions] = useState(5);
   const [questionTypes, setQuestionTypes] = useState<QuestionType[]>(['mcq', 'fill-in-the-blank']);
   const [generationProgress, setGenerationProgress] = useState(0);
+  const [pdfText, setPdfText] = useState('');
+  const [mcqLoading, setMcqLoading] = useState(false);
 
   const mcqPrompt = (
     <div className="p-4 bg-blue-100 border border-blue-400 rounded mb-4 text-blue-800">
       <strong>How it works:</strong> When you upload a PDF and click "Generate Questions", the document will be analyzed by AI. Key topics will be extracted and a set of MCQs will be automatically generated. You can review and edit each question below before publishing. The generated questions will then be visible to students when this exam is created.
+    </div>
+  );
+
+  const customPromptInfo = (
+    <div className="p-3 bg-green-100 border border-green-400 rounded mb-3 text-green-800">
+      <strong>Prompt:</strong> This MCQ generator analyzes your uploaded PDF using AI and will generate questions and answer options according to your provided document. All generated MCQs will automatically be available to students upon exam creation.
     </div>
   );
 
@@ -57,29 +65,75 @@ export default function ExamCreator() {
     });
   };
 
+  const handleCustomMCQGenerate = async () => {
+    if (!pdfText || pdfText.trim().length < 20) {
+      toast.error("Please upload a PDF and wait for text extraction first.");
+      return;
+    }
+    setMcqLoading(true);
+
+    try {
+      const extractKeyTopics = async (text, numTopics = 5) => {
+        const response = await fetch("/api/extract-topics", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text, numTopics }),
+        });
+        return response.json();
+      };
+
+      const generateMCQ = async (topic) => {
+        const response = await fetch("/api/generate-mcq", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ topic }),
+        });
+        return response.json();
+      };
+
+      const topics = await extractKeyTopics(pdfText, numQuestions);
+      const questions = await Promise.all(topics.map(generateMCQ));
+
+      const generatedQuestions = questions.map((mcq, idx) => ({
+        id: `pdf-q-custom-${Date.now()}-${idx}`,
+        text: mcq.question || 'Auto-generated question',
+        type: 'mcq',
+        options: Array.isArray(mcq.options) ? mcq.options : [],
+        correctAnswer: typeof mcq.correctAnswer === "number" ? mcq.correctAnswer : 0,
+      }));
+
+      setQuestions(generatedQuestions);
+      toast.success(`Generated ${generatedQuestions.length} MCQs!`);
+    } catch (err) {
+      toast.error("Could not generate MCQs. Please try again.");
+    }
+    setMcqLoading(false);
+  };
+
   const handleGenerateQuestions = async () => {
     if (!file) {
       toast.error('Please upload a PDF file first');
       return;
     }
-    
     setIsGenerating(true);
     setGenerationProgress(10);
 
     try {
       setGenerationProgress(30);
-      const pdfText = await extractTextFromPdf(file);
+      const text = await extractTextFromPdf(file);
 
+      setPdfText(text);
       setGenerationProgress(50);
+
       const topicsRes = await fetch("/api/extract-topics", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: pdfText, numTopics: numQuestions })
+        body: JSON.stringify({ text, numTopics: numQuestions })
       });
       const topics = await topicsRes.json();
 
       setGenerationProgress(70);
-      const questions = await Promise.all(topics.map((topic: any, i: number) =>
+      const questions = await Promise.all(topics.map((topic, i) =>
         fetch("/api/generate-mcq", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -87,10 +141,10 @@ export default function ExamCreator() {
         }).then(res => res.json())
       ));
 
-      const generatedQuestions: Question[] = questions.map((mcq: any, idx: number) => ({
+      const generatedQuestions = questions.map((mcq, idx) => ({
         id: `pdf-q-${Date.now()}-${idx}`,
         text: mcq.question || 'Auto-generated question',
-        type: 'mcq' as QuestionType,
+        type: 'mcq',
         options: Array.isArray(mcq.options) ? mcq.options : [],
         correctAnswer: (typeof mcq.correctAnswer === 'number') ? mcq.correctAnswer : 0,
       }));
@@ -155,7 +209,7 @@ export default function ExamCreator() {
         </CardHeader>
         <CardContent className="space-y-4">
           {mcqPrompt}
-
+          {customPromptInfo}
           <div className="space-y-2">
             <Label htmlFor="title">Exam Title</Label>
             <Input
