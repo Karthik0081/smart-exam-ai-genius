@@ -7,7 +7,12 @@ export default function Login() {
     <div className="min-h-screen bg-gray-100 flex flex-col">
       <header className="bg-smartex-blue text-white py-6">
         <div className="container mx-auto px-4 flex items-center">
-          <BookOpen size={32} className="mr-2" />
+          <img
+            src="/lovable-uploads/34537cd1-9844-4503-970c-e68b3fd548b6.png"
+            alt="SmartEx Logo"
+            className="h-12 mr-3 bg-white rounded shadow"
+            style={{ objectFit: 'contain' }}
+          />
           <h1 className="text-2xl font-bold">SmartEx</h1>
         </div>
       </header>

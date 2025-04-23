@@ -1,9 +1,8 @@
-
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { BookOpen, FileText, Brain, CheckCircle } from 'lucide-react';
+import { BookOpen } from 'lucide-react';
 
 export default function Index() {
   const { user } = useAuth();
@@ -21,7 +20,12 @@ export default function Index() {
       <header className="bg-smartex-blue text-white">
         <div className="container mx-auto px-4 py-8 flex justify-between items-center">
           <div className="flex items-center">
-            <BookOpen size={32} className="mr-2" />
+            <img
+              src="/lovable-uploads/34537cd1-9844-4503-970c-e68b3fd548b6.png"
+              alt="SmartEx Logo"
+              className="h-12 mr-3 bg-white rounded shadow"
+              style={{ objectFit: 'contain' }}
+            />
             <h1 className="text-2xl font-bold">SmartEx</h1>
           </div>
           <Button 
