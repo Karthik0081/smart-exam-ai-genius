@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { useData, Question, QuestionType } from '@/contexts/DataContext';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,12 +11,12 @@ import { Upload, Clock, Save, Loader2 } from 'lucide-react';
 import QuestionEditor from './QuestionEditor';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
-import { generateQuestionsFromText } from '@/utils/mcqGenerator';
+import { generateQuestionsFromText, validatePdfText } from '@/utils/mcqGenerator';
 import React from 'react';
 
 export default function ExamCreator() {
   const { user } = useAuth();
-  const { createExam, generateQuestionsFromPdf, extractTextFromPdf } = useData();
+  const { createExam, extractTextFromPdf } = useData();
   
   const [title, setTitle] = useState('');
   const [duration, setDuration] = useState(30);
@@ -26,19 +27,6 @@ export default function ExamCreator() {
   const [questionTypes, setQuestionTypes] = useState<QuestionType[]>(['mcq', 'fill-in-the-blank']);
   const [generationProgress, setGenerationProgress] = useState(0);
   const [pdfText, setPdfText] = useState('');
-  const [mcqLoading, setMcqLoading] = useState(false);
-
-  const mcqPrompt = (
-    <div className="p-4 bg-blue-100 border border-blue-400 rounded mb-4 text-blue-800">
-      <strong>How it works:</strong> When you upload a PDF and click "Generate Questions", the document will be analyzed by AI. Key topics will be extracted and a set of MCQs will be automatically generated. You can review and edit each question below before publishing. The generated questions will then be visible to students when this exam is created.
-    </div>
-  );
-
-  const customPromptInfo = (
-    <div className="p-3 bg-green-100 border border-green-400 rounded mb-3 text-green-800">
-      <strong>Prompt:</strong> This MCQ generator analyzes your uploaded PDF using AI and will generate questions and answer options according to your provided document. All generated MCQs will automatically be available to students upon exam creation.
-    </div>
-  );
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -66,78 +54,51 @@ export default function ExamCreator() {
     });
   };
 
-  const handleCustomMCQGenerate = async () => {
-    if (!pdfText || pdfText.trim().length < 20) {
-      toast.error("Please upload a PDF and wait for text extraction first.");
-      return;
-    }
-    setMcqLoading(true);
-
-    try {
-      const extractKeyTopics = async (text: string, numTopics = 5) => {
-        const response = await fetch("/api/extract-topics", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ text, numTopics }),
-        });
-        return response.json();
-      };
-
-      const generateMCQ = async (topic: any) => {
-        const response = await fetch("/api/generate-mcq", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ topic }),
-        });
-        return response.json();
-      };
-
-      const topics = await extractKeyTopics(pdfText, numQuestions);
-      const questions = await Promise.all(topics.map(generateMCQ));
-
-      const generatedQuestions: Question[] = questions.map((mcq, idx) => ({
-        id: `pdf-q-custom-${Date.now()}-${idx}`,
-        text: mcq.question || 'Auto-generated question',
-        type: 'mcq' as QuestionType,
-        options: Array.isArray(mcq.options) ? mcq.options : [],
-        correctAnswer: typeof mcq.correctAnswer === "number" ? mcq.correctAnswer : 0,
-      }));
-
-      setQuestions(generatedQuestions);
-      toast.success(`Generated ${generatedQuestions.length} MCQs!`);
-    } catch (err) {
-      toast.error("Could not generate MCQs. Please try again.");
-    }
-    setMcqLoading(false);
-  };
-
   const handleGenerateQuestions = async () => {
     if (!file) {
       toast.error('Please upload a PDF file first');
       return;
     }
+    
+    if (numQuestions < 1 || numQuestions > 20) {
+      toast.error('Please select between 1 and 20 questions');
+      return;
+    }
+    
     setIsGenerating(true);
     setGenerationProgress(10);
 
     try {
+      // Extract text from PDF
       setGenerationProgress(30);
       const text = await extractTextFromPdf(file);
       setPdfText(text);
+      
+      if (!validatePdfText(text)) {
+        throw new Error('Extracted text is too short or invalid');
+      }
+      
       setGenerationProgress(50);
 
+      // Generate questions from the extracted text
       const generatedQuestions = await generateQuestionsFromText(text, numQuestions);
       
       setGenerationProgress(100);
+      
+      // Check if we have valid questions
+      if (generatedQuestions.length === 0) {
+        throw new Error('No questions were generated');
+      }
+      
       setTimeout(() => {
         setQuestions(generatedQuestions);
         toast.success(`Generated ${generatedQuestions.length} questions`);
         setIsGenerating(false);
         setGenerationProgress(0);
       }, 500);
-
     } catch (error) {
-      console.error(error);
-      toast.error('Failed to generate questions');
+      console.error('Error generating questions:', error);
+      toast.error(`Failed to generate questions: ${error instanceof Error ? error.message : 'Unknown error'}`);
       setIsGenerating(false);
       setGenerationProgress(0);
     }
@@ -148,24 +109,32 @@ export default function ExamCreator() {
       toast.error('Please enter an exam title');
       return;
     }
+    
     if (duration < 5) {
       toast.error('Exam duration must be at least 5 minutes');
       return;
     }
+    
     if (questions.length === 0) {
       toast.error('Please generate or add questions');
       return;
     }
+    
     if (!user) {
       toast.error('You must be logged in to create an exam');
       return;
     }
+    
     createExam({
       title,
       duration,
       questions,
       createdBy: user.id,
     });
+    
+    toast.success('Exam created successfully');
+    
+    // Reset form
     setTitle('');
     setDuration(30);
     setQuestions([]);
@@ -186,8 +155,10 @@ export default function ExamCreator() {
           <CardDescription>Upload a PDF and generate AI-powered questions</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {mcqPrompt}
-          {customPromptInfo}
+          <div className="p-4 bg-blue-100 border border-blue-400 rounded mb-4 text-blue-800">
+            <strong>How it works:</strong> Upload a PDF document and specify the number of questions to generate. The AI will analyze the content and create multiple-choice questions based on the key topics.
+          </div>
+          
           <div className="space-y-2">
             <Label htmlFor="title">Exam Title</Label>
             <Input
@@ -267,7 +238,7 @@ export default function ExamCreator() {
                 id="numQuestions"
                 type="number"
                 value={numQuestions}
-                onChange={(e) => setNumQuestions(parseInt(e.target.value) || 5)}
+                onChange={(e) => setNumQuestions(Math.min(Math.max(1, parseInt(e.target.value) || 1), 20))}
                 min="1"
                 max="20"
                 className="flex-1"

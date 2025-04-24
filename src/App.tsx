@@ -19,6 +19,7 @@ import StudentDashboard from "./pages/StudentDashboard";
 import StudentExam from "./pages/StudentExam";
 import StudentResults from "./pages/StudentResults";
 import NotFound from "./pages/NotFound";
+import MCQGenerator from "./pages/MCQGenerator"; // Added the new MCQGenerator page
 
 import ProtectedRoute from "./components/ProtectedRoute";
 
@@ -37,6 +38,7 @@ const App = () => (
                 {/* Public routes */}
                 <Route path="/" element={<Index />} />
                 <Route path="/login" element={<Login />} />
+                <Route path="/mcq-generator" element={<MCQGenerator />} /> {/* Added new route */}
                 
                 {/* Authentication redirect */}
                 <Route path="/dashboard" element={<Dashboard />} />

@@ -1,8 +1,9 @@
+
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { BookOpen, FileText as FileTextIcon, Brain, CheckCircle } from 'lucide-react';
+import { BookOpen, FileText, Brain, CheckCircle } from 'lucide-react';
 
 export default function Index() {
   const { user } = useAuth();
