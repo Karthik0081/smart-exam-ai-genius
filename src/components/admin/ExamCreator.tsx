@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { useData, Question, QuestionType } from '@/contexts/DataContext';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -73,7 +74,7 @@ export default function ExamCreator() {
     setMcqLoading(true);
 
     try {
-      const extractKeyTopics = async (text, numTopics = 5) => {
+      const extractKeyTopics = async (text: string, numTopics = 5) => {
         const response = await fetch("/api/extract-topics", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -82,7 +83,7 @@ export default function ExamCreator() {
         return response.json();
       };
 
-      const generateMCQ = async (topic) => {
+      const generateMCQ = async (topic: any) => {
         const response = await fetch("/api/generate-mcq", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -94,10 +95,10 @@ export default function ExamCreator() {
       const topics = await extractKeyTopics(pdfText, numQuestions);
       const questions = await Promise.all(topics.map(generateMCQ));
 
-      const generatedQuestions = questions.map((mcq, idx) => ({
+      const generatedQuestions: Question[] = questions.map((mcq, idx) => ({
         id: `pdf-q-custom-${Date.now()}-${idx}`,
         text: mcq.question || 'Auto-generated question',
-        type: 'mcq',
+        type: 'mcq' as QuestionType,
         options: Array.isArray(mcq.options) ? mcq.options : [],
         correctAnswer: typeof mcq.correctAnswer === "number" ? mcq.correctAnswer : 0,
       }));
@@ -133,7 +134,7 @@ export default function ExamCreator() {
       const topics = await topicsRes.json();
 
       setGenerationProgress(70);
-      const questions = await Promise.all(topics.map((topic, i) =>
+      const questions = await Promise.all(topics.map((topic: any, i: number) =>
         fetch("/api/generate-mcq", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -141,10 +142,10 @@ export default function ExamCreator() {
         }).then(res => res.json())
       ));
 
-      const generatedQuestions = questions.map((mcq, idx) => ({
+      const generatedQuestions: Question[] = questions.map((mcq, idx) => ({
         id: `pdf-q-${Date.now()}-${idx}`,
         text: mcq.question || 'Auto-generated question',
-        type: 'mcq',
+        type: 'mcq' as QuestionType,
         options: Array.isArray(mcq.options) ? mcq.options : [],
         correctAnswer: (typeof mcq.correctAnswer === 'number') ? mcq.correctAnswer : 0,
       }));
