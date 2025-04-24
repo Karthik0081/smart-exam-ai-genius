@@ -1,4 +1,3 @@
-
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -65,7 +64,7 @@ export default function Index() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div className="p-6 border rounded-lg shadow-sm text-center">
               <div className="inline-block p-3 bg-blue-100 rounded-full mb-4">
-                <FileTextIcon size={24} className="text-smartex-blue" />
+                <FileText size={24} className="text-smartex-blue" />
               </div>
               <h3 className="text-xl font-semibold mb-3">PDF Upload</h3>
               <p className="text-gray-600">

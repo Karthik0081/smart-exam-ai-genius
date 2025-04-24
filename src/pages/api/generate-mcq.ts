@@ -1,10 +1,18 @@
 
-import type { NextApiRequest, NextApiResponse } from 'next';
+// This file is for API simulation in a frontend environment
 
-// This file is meant to be used in a server environment like Next.js API routes
-// For the frontend implementation, we'll simulate its behavior
+// Define our own request and response types to replace Next.js types
+interface Request {
+  method: string;
+  body: any;
+}
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+interface Response {
+  status: (code: number) => Response;
+  json: (data: any) => any;
+}
+
+export default async function handler(req: Request, res: Response) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
