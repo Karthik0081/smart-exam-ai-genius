@@ -1,9 +1,8 @@
-
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
-import { BookOpen, FileText as FiletextIcon, Brain, CheckCircle } from 'lucide-react';
+import { BookOpen, FileText as FileTextIcon, Brain, CheckCircle } from 'lucide-react';
 
 export default function Index() {
   const { user } = useAuth();
@@ -17,7 +16,6 @@ export default function Index() {
   
   return (
     <div className="min-h-screen flex flex-col">
-      {/* Hero Section */}
       <header className="bg-smartex-blue text-white">
         <div className="container mx-auto px-4 py-8 flex justify-between items-center">
           <div className="flex items-center">
@@ -59,7 +57,6 @@ export default function Index() {
         </div>
       </header>
       
-      {/* Features Section */}
       <section className="py-16 bg-white">
         <div className="container mx-auto px-4">
           <h2 className="text-3xl font-bold text-center mb-12">Key Features</h2>
@@ -67,7 +64,7 @@ export default function Index() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
             <div className="p-6 border rounded-lg shadow-sm text-center">
               <div className="inline-block p-3 bg-blue-100 rounded-full mb-4">
-                <FiletextIcon size={24} className="text-smartex-blue" />
+                <FileTextIcon size={24} className="text-smartex-blue" />
               </div>
               <h3 className="text-xl font-semibold mb-3">PDF Upload</h3>
               <p className="text-gray-600">
@@ -98,7 +95,6 @@ export default function Index() {
         </div>
       </section>
       
-      {/* How It Works Section */}
       <section className="py-16 bg-gray-50">
         <div className="container mx-auto px-4">
           <h2 className="text-3xl font-bold text-center mb-12">How It Works</h2>
@@ -155,7 +151,6 @@ export default function Index() {
         </div>
       </section>
       
-      {/* CTA Section */}
       <section className="py-16 bg-smartex-darkblue text-white">
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-3xl font-bold mb-6">Ready to Transform Your Testing Experience?</h2>

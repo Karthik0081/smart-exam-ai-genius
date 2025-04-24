@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { useData, Question, QuestionType } from '@/contexts/DataContext';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,6 +10,7 @@ import { Upload, Clock, Save, Loader2 } from 'lucide-react';
 import QuestionEditor from './QuestionEditor';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
+import { generateQuestionsFromText } from '@/utils/mcqGenerator';
 import React from 'react';
 
 export default function ExamCreator() {
@@ -122,34 +122,11 @@ export default function ExamCreator() {
     try {
       setGenerationProgress(30);
       const text = await extractTextFromPdf(file);
-
       setPdfText(text);
       setGenerationProgress(50);
 
-      const topicsRes = await fetch("/api/extract-topics", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, numTopics: numQuestions })
-      });
-      const topics = await topicsRes.json();
-
-      setGenerationProgress(70);
-      const questions = await Promise.all(topics.map((topic: any, i: number) =>
-        fetch("/api/generate-mcq", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ topic }),
-        }).then(res => res.json())
-      ));
-
-      const generatedQuestions: Question[] = questions.map((mcq, idx) => ({
-        id: `pdf-q-${Date.now()}-${idx}`,
-        text: mcq.question || 'Auto-generated question',
-        type: 'mcq' as QuestionType,
-        options: Array.isArray(mcq.options) ? mcq.options : [],
-        correctAnswer: (typeof mcq.correctAnswer === 'number') ? mcq.correctAnswer : 0,
-      }));
-
+      const generatedQuestions = await generateQuestionsFromText(text, numQuestions);
+      
       setGenerationProgress(100);
       setTimeout(() => {
         setQuestions(generatedQuestions);
