@@ -3,14 +3,16 @@ import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import MainHeader from '@/components/MainHeader';
 import ExamList from '@/components/admin/ExamList';
+import TopStudents from '@/components/admin/TopStudents';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { PlusCircle, ListChecks } from 'lucide-react';
+import { PlusCircle, ListChecks, Trophy } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export default function AdminDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const [activeTab, setActiveTab] = useState("exams");
   
   if (!user) return null;
   
@@ -32,7 +34,26 @@ export default function AdminDashboard() {
         </div>
         
         <div className="space-y-6">
-          <ExamList />
+          <Tabs defaultValue="exams" onValueChange={setActiveTab} value={activeTab}>
+            <TabsList className="mb-6">
+              <TabsTrigger value="exams" className="flex items-center">
+                <ListChecks size={16} className="mr-2" />
+                Exams
+              </TabsTrigger>
+              <TabsTrigger value="students" className="flex items-center">
+                <Trophy size={16} className="mr-2" />
+                Top Students
+              </TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="exams">
+              <ExamList />
+            </TabsContent>
+            
+            <TabsContent value="students">
+              <TopStudents />
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
       

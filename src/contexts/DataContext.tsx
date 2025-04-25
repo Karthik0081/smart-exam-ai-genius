@@ -26,9 +26,17 @@ export type Submission = {
   id: string;
   examId: string;
   studentId: string;
+  studentName?: string; // Added for displaying student names in rankings
   answers: number[]; // Index of the selected answer for each question
   score: number;
   submittedAt: Date;
+};
+
+export type Student = {
+  id: string;
+  name: string;
+  totalScore: number;
+  examsTaken: number;
 };
 
 type DataContextType = {
@@ -42,6 +50,7 @@ type DataContextType = {
   getSubmissionsByExam: (examId: string) => Submission[];
   getStudentSubmissionForExam: (studentId: string, examId: string) => Submission | undefined;
   extractTextFromPdf: (file: File) => Promise<string>;
+  getTopStudents: (limit?: number) => Student[];
 };
 
 // Create context
@@ -216,6 +225,46 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
   const getStudentSubmissionForExam = (studentId: string, examId: string) => 
     submissions.find(s => s.studentId === studentId && s.examId === examId);
 
+  // Get top performing students
+  const getTopStudents = (limit: number = 10): Student[] => {
+    // Create a map to track student scores across all exams
+    const studentScores: Record<string, { totalScore: number; examsTaken: number; name: string }> = {};
+    
+    // Process all submissions to calculate student scores
+    submissions.forEach(submission => {
+      if (!studentScores[submission.studentId]) {
+        studentScores[submission.studentId] = { 
+          totalScore: 0, 
+          examsTaken: 0,
+          name: submission.studentName || `Student ${submission.studentId}`
+        };
+      }
+      
+      studentScores[submission.studentId].totalScore += submission.score;
+      studentScores[submission.studentId].examsTaken += 1;
+    });
+    
+    // Convert to array and sort by average score
+    const students = Object.entries(studentScores).map(([id, data]) => ({
+      id,
+      name: data.name,
+      totalScore: data.totalScore,
+      examsTaken: data.examsTaken,
+      averageScore: data.examsTaken > 0 ? data.totalScore / data.examsTaken : 0
+    }));
+    
+    // Sort by average score
+    students.sort((a, b) => b.averageScore - a.averageScore);
+    
+    // Return top N students
+    return students.slice(0, limit).map(s => ({
+      id: s.id,
+      name: s.name,
+      totalScore: s.totalScore,
+      examsTaken: s.examsTaken
+    }));
+  };
+
   const value = {
     exams,
     submissions,
@@ -227,6 +276,7 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     getSubmissionsByExam,
     getStudentSubmissionForExam,
     extractTextFromPdf,
+    getTopStudents,
   };
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;
