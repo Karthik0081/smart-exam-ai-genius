@@ -1,9 +1,15 @@
 
 import { Question, QuestionType } from '@/contexts/DataContext';
 import { toast } from '@/components/ui/sonner';
+import { getApiKey, hasApiKey } from './apiConfig';
 
 export const extractKeyTopics = async (text: string, numTopics: number = 5) => {
   try {
+    if (!hasApiKey('openai')) {
+      toast.error('OpenAI API key is not configured. Please set it up in the admin settings.');
+      throw new Error('OpenAI API key not found');
+    }
+    
     const response = await fetch("/api/extract-topics", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -11,7 +17,8 @@ export const extractKeyTopics = async (text: string, numTopics: number = 5) => {
     });
     
     if (!response.ok) {
-      throw new Error(`Failed to extract topics: ${response.statusText}`);
+      const errorData = await response.json();
+      throw new Error(`Failed to extract topics: ${errorData.error || response.statusText}`);
     }
     
     return await response.json();
@@ -23,6 +30,11 @@ export const extractKeyTopics = async (text: string, numTopics: number = 5) => {
 
 export const generateMCQ = async (topic: any) => {
   try {
+    if (!hasApiKey('openai')) {
+      toast.error('OpenAI API key is not configured. Please set it up in the admin settings.');
+      throw new Error('OpenAI API key not found');
+    }
+    
     const response = await fetch("/api/generate-mcq", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -30,7 +42,8 @@ export const generateMCQ = async (topic: any) => {
     });
     
     if (!response.ok) {
-      throw new Error(`Failed to generate MCQ: ${response.statusText}`);
+      const errorData = await response.json();
+      throw new Error(`Failed to generate MCQ: ${errorData.error || response.statusText}`);
     }
     
     return await response.json();
@@ -44,6 +57,12 @@ export const generateQuestionsFromText = async (text: string, numQuestions: numb
   try {
     // Validate the number of questions
     const validatedNumQuestions = Math.min(Math.max(1, numQuestions), 20);
+    
+    // Check for API key
+    if (!hasApiKey('openai')) {
+      toast.error('OpenAI API key is not configured. Please set it up in the admin settings.');
+      throw new Error('OpenAI API key not found');
+    }
     
     // Extract topics based on the requested number of questions
     const topics = await extractKeyTopics(text, validatedNumQuestions);

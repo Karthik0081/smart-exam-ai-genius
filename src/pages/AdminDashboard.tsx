@@ -4,9 +4,10 @@ import { useAuth } from '@/contexts/AuthContext';
 import MainHeader from '@/components/MainHeader';
 import ExamList from '@/components/admin/ExamList';
 import TopStudents from '@/components/admin/TopStudents';
+import ApiKeySettings from '@/components/admin/ApiKeySettings';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { PlusCircle, ListChecks, Trophy } from 'lucide-react';
+import { PlusCircle, ListChecks, Trophy, Settings } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 export default function AdminDashboard() {
@@ -44,6 +45,10 @@ export default function AdminDashboard() {
                 <Trophy size={16} className="mr-2" />
                 Top Students
               </TabsTrigger>
+              <TabsTrigger value="settings" className="flex items-center">
+                <Settings size={16} className="mr-2" />
+                API Settings
+              </TabsTrigger>
             </TabsList>
             
             <TabsContent value="exams">
@@ -52,6 +57,10 @@ export default function AdminDashboard() {
             
             <TabsContent value="students">
               <TopStudents />
+            </TabsContent>
+            
+            <TabsContent value="settings">
+              <ApiKeySettings />
             </TabsContent>
           </Tabs>
         </div>
