@@ -26,12 +26,18 @@ export const clearApiKey = (service: keyof typeof API_KEYS): void => {
   localStorage.removeItem(`smartex-${service}-key`);
 };
 
-// For development purposes, initialize with the provided key
+// For development purposes, initialize with provided keys
 // In production, this would be handled via proper authentication and secure storage
 if (import.meta.env.DEV) {
   // This will run only in development
   const existingOpenAIKey = localStorage.getItem('smartex-openai-key');
   if (!existingOpenAIKey) {
     localStorage.setItem('smartex-openai-key', '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');
+  }
+  
+  // Add the Gemini API key if not already set
+  const existingGeminiKey = localStorage.getItem('smartex-gemini-key');
+  if (!existingGeminiKey) {
+    localStorage.setItem('smartex-gemini-key', 'AIzaSyCdoc5aAS2ot6ZuPN300G7z_qHFUjKS4So');
   }
 }

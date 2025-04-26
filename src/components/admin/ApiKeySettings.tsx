@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { toast } from '@/components/ui/sonner';
-import { Key, Eye, EyeOff, CheckCircle, Save, Tabs, TabsList, TabsTrigger, TabsContent } from 'lucide-react';
+import { Key, Eye, EyeOff, CheckCircle, Save } from 'lucide-react';
 import { getApiKey, saveApiKey, hasApiKey, clearApiKey } from '@/utils/apiConfig';
 
 export default function ApiKeySettings() {
