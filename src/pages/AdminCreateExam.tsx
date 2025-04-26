@@ -1,7 +1,6 @@
-
 import { useAuth } from '@/contexts/AuthContext';
 import MainHeader from '@/components/MainHeader';
-import ExamCreator from '@/components/admin/ExamCreator';
+import ExamCreator from '@/components/admin/exam-creator/ExamCreator';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
