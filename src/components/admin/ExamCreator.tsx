@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useData, Question, QuestionType } from '@/contexts/DataContext';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -11,8 +11,13 @@ import { Upload, Clock, Save, Loader2 } from 'lucide-react';
 import QuestionEditor from './QuestionEditor';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from '@/components/ui/progress';
-import { generateQuestionsFromText, validatePdfText } from '@/utils/mcqGenerator';
-import React from 'react';
+import { 
+  generateQuestionsFromText, 
+  validatePdfText, 
+  getAvailableProvider 
+} from '@/utils/mcqGenerator';
+import { hasApiKey } from '@/utils/apiConfig';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 export default function ExamCreator() {
   const { user } = useAuth();
@@ -27,6 +32,21 @@ export default function ExamCreator() {
   const [questionTypes, setQuestionTypes] = useState<QuestionType[]>(['mcq', 'fill-in-the-blank']);
   const [generationProgress, setGenerationProgress] = useState(0);
   const [pdfText, setPdfText] = useState('');
+  const [aiProvider, setAiProvider] = useState<string>('auto');
+  const [availableProviders, setAvailableProviders] = useState<string[]>([]);
+
+  // Check available AI providers
+  useEffect(() => {
+    const providers = [];
+    if (hasApiKey('openai')) providers.push('openai');
+    if (hasApiKey('gemini')) providers.push('gemini');
+    setAvailableProviders(providers);
+    
+    // Set default provider if available
+    if (providers.length > 0 && aiProvider === 'auto') {
+      setAiProvider(providers[0]);
+    }
+  }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -62,6 +82,13 @@ export default function ExamCreator() {
     
     if (numQuestions < 1 || numQuestions > 20) {
       toast.error('Please select between 1 and 20 questions');
+      return;
+    }
+    
+    // Check if any AI provider is available
+    const provider = getAvailableProvider();
+    if (!provider) {
+      toast.error('No AI provider is configured. Please set up either OpenAI or Gemini API key in the admin settings.');
       return;
     }
     
@@ -209,6 +236,32 @@ export default function ExamCreator() {
             )}
           </div>
           
+          {availableProviders.length > 0 && (
+            <div className="space-y-2">
+              <Label htmlFor="aiProvider">AI Provider</Label>
+              <Select value={aiProvider} onValueChange={setAiProvider}>
+                <SelectTrigger id="aiProvider" className="w-full md:w-[240px]">
+                  <SelectValue placeholder="Select AI Provider" />
+                </SelectTrigger>
+                <SelectContent>
+                  {hasApiKey('openai') && (
+                    <SelectItem value="openai">OpenAI</SelectItem>
+                  )}
+                  {hasApiKey('gemini') && (
+                    <SelectItem value="gemini">Google Gemini</SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-gray-500">
+                {aiProvider === 'openai' 
+                  ? 'Using OpenAI to generate questions' 
+                  : aiProvider === 'gemini' 
+                    ? 'Using Google Gemini to generate questions'
+                    : 'Select an AI provider'}
+              </p>
+            </div>
+          )}
+          
           <div className="space-y-2">
             <Label>Question Types</Label>
             <div className="flex flex-wrap gap-4">
@@ -245,7 +298,7 @@ export default function ExamCreator() {
               />
               <Button 
                 onClick={handleGenerateQuestions} 
-                disabled={!file || isGenerating}
+                disabled={!file || isGenerating || availableProviders.length === 0}
                 className="flex items-center"
               >
                 {isGenerating ? (
