@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useData, Question, QuestionType } from '@/contexts/DataContext';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,6 +17,8 @@ import {
 } from '@/utils/mcqGenerator';
 import { hasApiKey } from '@/utils/apiConfig';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { Textarea } from "@/components/ui/textarea"
 
 export default function ExamCreator() {
   const { user } = useAuth();
