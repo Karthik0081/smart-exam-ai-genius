@@ -1,9 +1,11 @@
+
 import { useAuth } from '@/contexts/AuthContext';
 import MainHeader from '@/components/MainHeader';
 import ExamCreator from '@/components/admin/exam-creator/ExamCreator';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { TooltipProvider } from '@/components/ui/tooltip';
 
 export default function AdminCreateExam() {
   const { user } = useAuth();
@@ -27,9 +29,11 @@ export default function AdminCreateExam() {
           </p>
         </div>
         
-        <div className="space-y-6">
-          <ExamCreator />
-        </div>
+        <TooltipProvider>
+          <div className="space-y-6">
+            <ExamCreator />
+          </div>
+        </TooltipProvider>
       </div>
       
       <footer className="bg-gray-200 py-4">

@@ -2,6 +2,7 @@
 import { Question, QuestionType } from '@/contexts/DataContext';
 import { toast } from '@/components/ui/sonner';
 import { getApiKey, hasApiKey } from './apiConfig';
+import { extractKeyTopics, generateQuestionsFromTopics } from './pdfAnalyzer';
 
 interface AIProvider {
   name: string;
@@ -35,109 +36,86 @@ export const getAvailableProvider = (): AIProvider | null => {
   return null;
 };
 
-export const extractKeyTopics = async (text: string, numTopics: number = 5, provider?: string) => {
-  // Determine which provider to use
-  const selectedProvider = provider && PROVIDERS[provider] 
-    ? PROVIDERS[provider] 
-    : getAvailableProvider();
-  
-  if (!selectedProvider) {
-    toast.error('No AI provider is configured. Please set up either OpenAI or Gemini API key in the admin settings.');
-    throw new Error('No API key found');
-  }
-  
-  try {
-    if (!hasApiKey(selectedProvider.apiKeyName)) {
-      toast.error(`${selectedProvider.name} API key is not configured. Please set it up in the admin settings.`);
-      throw new Error(`${selectedProvider.name} API key not found`);
-    }
-    
-    const response = await fetch(selectedProvider.extractTopicsEndpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text, numTopics }),
-    });
-    
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(`Failed to extract topics: ${errorData.error || response.statusText}`);
-    }
-    
-    return await response.json();
-  } catch (error) {
-    console.error('Error extracting topics:', error);
-    throw error;
-  }
+// Simple validation utility for the PDF text
+export const validatePdfText = (text: string): boolean => {
+  return text !== undefined && text !== null && text.trim().length >= 100;
 };
 
-export const generateMCQ = async (topic: any, provider?: string) => {
-  // Determine which provider to use
-  const selectedProvider = provider && PROVIDERS[provider] 
-    ? PROVIDERS[provider] 
-    : getAvailableProvider();
-  
-  if (!selectedProvider) {
-    toast.error('No AI provider is configured. Please set up either OpenAI or Gemini API key in the admin settings.');
-    throw new Error('No API key found');
-  }
-  
+export const generateQuestionsFromText = async (
+  text: string, 
+  numQuestions: number,
+  questionTypes: QuestionType[] = ['mcq', 'fill-in-the-blank']
+): Promise<Question[]> => {
   try {
-    if (!hasApiKey(selectedProvider.apiKeyName)) {
-      toast.error(`${selectedProvider.name} API key is not configured. Please set it up in the admin settings.`);
-      throw new Error(`${selectedProvider.name} API key not found`);
+    // Validate text input
+    if (!validatePdfText(text)) {
+      toast.error('The extracted text is too short or invalid');
+      return [];
     }
     
-    const response = await fetch(selectedProvider.generateMcqEndpoint, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ topic }),
-    });
-    
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(`Failed to generate MCQ: ${errorData.error || response.statusText}`);
-    }
-    
-    return await response.json();
-  } catch (error) {
-    console.error('Error generating MCQ:', error);
-    throw error;
-  }
-};
-
-export const generateQuestionsFromText = async (text: string, numQuestions: number): Promise<Question[]> => {
-  try {
-    // Validate the number of questions
-    const validatedNumQuestions = Math.min(Math.max(1, numQuestions), 20);
-    
-    // Get the available AI provider
+    // First try to use the API-based approach if configured
     const provider = getAvailableProvider();
     
-    if (!provider) {
-      toast.error('No AI provider is configured. Please set up either OpenAI or Gemini API key in the admin settings.');
-      throw new Error('No API key found');
+    if (provider) {
+      try {
+        // Try to use the API-based question generation
+        toast.info(`Using ${provider.name} for question generation`);
+        
+        // Make API request to extract topics
+        const response = await fetch(provider.extractTopicsEndpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text, numTopics: numQuestions }),
+        });
+        
+        if (!response.ok) {
+          throw new Error(`API error: ${response.statusText}`);
+        }
+        
+        const topics = await response.json();
+        
+        // Generate MCQs for each topic
+        const mcqPromises = topics.map((topic: any) => 
+          fetch(provider.generateMcqEndpoint, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ topic }),
+          }).then(res => res.json())
+        );
+        
+        const generatedQuestions = await Promise.all(mcqPromises);
+        
+        // Map the API responses to our Question format
+        return generatedQuestions.map((mcq, idx) => ({
+          id: `api-q-${Date.now()}-${idx}`,
+          text: mcq.question || 'API-generated question',
+          type: 'mcq' as QuestionType,
+          options: Array.isArray(mcq.options) ? mcq.options : [],
+          correctAnswer: typeof mcq.correctAnswer === "number" ? mcq.correctAnswer : 0,
+        }));
+      } catch (apiError) {
+        console.error('API-based generation failed, falling back to local generation:', apiError);
+        // If API-based generation fails, fall back to local generation
+        toast.warning('API-based generation failed, using fallback method');
+      }
     }
     
-    // Extract topics based on the requested number of questions
-    const topics = await extractKeyTopics(text, validatedNumQuestions, provider.name.toLowerCase());
+    // Fallback to local topic extraction and question generation
+    const topics = await extractKeyTopics(text, numQuestions);
     
-    if (!Array.isArray(topics) || topics.length === 0) {
-      throw new Error('No valid topics were extracted from the document');
+    if (topics.length === 0) {
+      throw new Error('Failed to extract topics from the document');
     }
     
-    // Generate MCQs for each topic
-    const mcqPromises = topics.slice(0, validatedNumQuestions).map(topic => 
-      generateMCQ(topic, provider.name.toLowerCase())
+    const questions = await generateQuestionsFromTopics(
+      topics, 
+      questionTypes, 
+      numQuestions
     );
-    const questions = await Promise.all(mcqPromises);
     
-    // Map the API responses to our Question format
-    return questions.map((mcq, idx) => ({
-      id: `text-q-${Date.now()}-${idx}`,
-      text: mcq.question || 'Auto-generated question',
-      type: 'mcq' as QuestionType,
-      options: Array.isArray(mcq.options) ? mcq.options : [],
-      correctAnswer: typeof mcq.correctAnswer === "number" ? mcq.correctAnswer : 0,
+    return questions.map((q, index) => ({
+      ...q,
+      id: `local-q-${Date.now()}-${index}`
     }));
   } catch (error) {
     console.error('Error generating questions:', error);
@@ -146,7 +124,11 @@ export const generateQuestionsFromText = async (text: string, numQuestions: numb
   }
 };
 
-// Simple validation utility for the PDF text
-export const validatePdfText = (text: string): boolean => {
-  return text !== undefined && text !== null && text.trim().length >= 100;
-};
+// Helper function to create a blank question template
+export const createBlankQuestion = (): Question => ({
+  id: `custom-${Date.now()}`,
+  text: '',
+  type: 'mcq',
+  options: ['', '', '', ''],
+  correctAnswer: 0
+});

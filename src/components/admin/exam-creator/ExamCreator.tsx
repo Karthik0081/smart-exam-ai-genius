@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useData, Question, QuestionType } from '@/contexts/DataContext';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -7,9 +7,9 @@ import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { toast } from '@/components/ui/sonner';
 import { useAuth } from '@/contexts/AuthContext';
-import { Upload, Loader2, Save } from 'lucide-react';
+import { Upload, Loader2, Save, Plus, FileText } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { getAvailableProvider, generateQuestionsFromText, validatePdfText } from '@/utils/mcqGenerator';
+import { getAvailableProvider, generateQuestionsFromText, createBlankQuestion } from '@/utils/mcqGenerator';
 import { hasApiKey } from '@/utils/apiConfig';
 import { FileUpload } from './FileUpload';
 import { QuestionTypeSelector } from './QuestionTypeSelector';
@@ -18,7 +18,7 @@ import { Progress } from '@/components/ui/progress';
 
 export default function ExamCreator() {
   const { user } = useAuth();
-  const { createExam, extractTextFromPdf } = useData();
+  const { createExam } = useData();
   
   const [title, setTitle] = useState('');
   const [duration, setDuration] = useState(30);
@@ -35,7 +35,7 @@ export default function ExamCreator() {
   const [processingProgress, setProcessingProgress] = useState(0);
 
   // Check available AI providers
-  useEffect(() => {
+  useState(() => {
     const providers = [];
     if (hasApiKey('openai')) providers.push('openai');
     if (hasApiKey('gemini')) providers.push('gemini');
@@ -45,7 +45,7 @@ export default function ExamCreator() {
     if (providers.length > 0 && aiProvider === 'auto') {
       setAiProvider(providers[0]);
     }
-  }, []);
+  });
 
   const handleGenerateQuestions = async () => {
     if (!pdfText) {
@@ -58,13 +58,6 @@ export default function ExamCreator() {
       return;
     }
     
-    // Check if any AI provider is available
-    const provider = getAvailableProvider();
-    if (!provider) {
-      toast.error('No AI provider is configured. Please set up either OpenAI or Gemini API key in the admin settings.');
-      return;
-    }
-    
     setIsGenerating(true);
     setGenerationProgress(10);
 
@@ -72,7 +65,11 @@ export default function ExamCreator() {
       setGenerationProgress(50);
 
       // Generate questions from the extracted text
-      const generatedQuestions = await generateQuestionsFromText(pdfText, numQuestions);
+      const generatedQuestions = await generateQuestionsFromText(
+        pdfText, 
+        numQuestions,
+        questionTypes
+      );
       
       setGenerationProgress(100);
       
@@ -130,12 +127,21 @@ export default function ExamCreator() {
     setDuration(30);
     setQuestions([]);
     setFile(null);
+    setPdfText('');
   };
   
   const handleUpdateQuestion = (index: number, updatedQuestion: Question) => {
     const newQuestions = [...questions];
     newQuestions[index] = updatedQuestion;
     setQuestions(newQuestions);
+  };
+  
+  const handleDeleteQuestion = (index: number) => {
+    setQuestions(questions.filter((_, i) => i !== index));
+  };
+  
+  const handleAddCustomQuestion = () => {
+    setQuestions([...questions, createBlankQuestion()]);
   };
   
   return (
@@ -146,7 +152,7 @@ export default function ExamCreator() {
           <CardDescription>Upload study material and generate AI-powered questions</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="p-4 bg-blue-100 border border-blue-400 rounded mb-4 text-blue-800">
+          <div className="p-4 bg-blue-50 border border-blue-200 rounded mb-4 text-blue-800">
             <strong>How it works:</strong> Upload a PDF document and specify the number of questions to generate. The AI will analyze the content and create multiple-choice questions based on the key topics.
           </div>
           
@@ -237,7 +243,7 @@ export default function ExamCreator() {
               />
               <Button 
                 onClick={handleGenerateQuestions} 
-                disabled={!pdfText || isGenerating || availableProviders.length === 0}
+                disabled={!pdfText || isGenerating}
                 className="flex items-center"
               >
                 {isGenerating ? (
@@ -279,6 +285,8 @@ export default function ExamCreator() {
             <GeneratedQuestions 
               questions={questions}
               onUpdateQuestion={handleUpdateQuestion}
+              onDeleteQuestion={handleDeleteQuestion}
+              onAddQuestion={handleAddCustomQuestion}
             />
           </CardContent>
           <CardFooter>

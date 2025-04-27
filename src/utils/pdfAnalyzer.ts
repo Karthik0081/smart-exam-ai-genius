@@ -2,8 +2,10 @@
 import { toast } from '@/components/ui/sonner';
 
 // Define types for topics and clusters
-type Topic = {
-  terms: string[];
+export type Topic = {
+  title: string;
+  keywords: string[];
+  context: string;
   sentences: string[];
 };
 
@@ -72,91 +74,68 @@ export async function extractTextFromPdf(file: File): Promise<string> {
   });
 }
 
-// Simple TF-IDF implementation to extract important terms
-function calculateTermFrequency(
-  terms: string[], 
-  allDocuments: string[][]
-): {term: string, score: number}[] {
-  // Calculate document frequency (how many documents contain each term)
-  const documentFrequency: Record<string, number> = {};
-  terms.forEach(term => {
-    documentFrequency[term] = allDocuments.filter(doc => 
-      doc.some(word => word.toLowerCase() === term.toLowerCase())
-    ).length;
+// Advanced text processing utilities
+function preprocessText(text: string): string[] {
+  return text
+    .replace(/\n+/g, ' ')
+    .replace(/[^\w\s.?!]/g, ' ')
+    .split(/[.!?]+/)
+    .map(s => s.trim())
+    .filter(s => s.length > 10);
+}
+
+function extractSections(text: string): { title: string, content: string }[] {
+  // Match section headers and content
+  const sectionPattern = /Section \d+:([^\n]+)\n([\s\S]*?)(?=Section \d+:|$)/g;
+  const sections: { title: string, content: string }[] = [];
+  
+  let match;
+  while ((match = sectionPattern.exec(text)) !== null) {
+    sections.push({
+      title: match[1].trim(),
+      content: match[2].trim()
+    });
+  }
+  
+  return sections;
+}
+
+function extractKeywords(text: string): string[] {
+  // Simple keyword extraction - use nouns and technical terms
+  const words = text.toLowerCase().match(/\b[a-z]{4,}\b/g) || [];
+  const stopWords = new Set(['this', 'that', 'then', 'than', 'with', 'from', 'there', 'these', 'those', 'have', 'been']);
+  
+  const frequencyMap: Record<string, number> = {};
+  words.forEach(word => {
+    if (!stopWords.has(word)) {
+      frequencyMap[word] = (frequencyMap[word] || 0) + 1;
+    }
   });
   
-  // Calculate TF-IDF scores
-  return terms.map(term => {
-    const termFrequency = terms.filter(t => t === term).length / terms.length;
-    const inverseDocumentFrequency = Math.log(
-      allDocuments.length / (1 + (documentFrequency[term] || 0))
-    );
-    return { 
-      term, 
-      score: termFrequency * inverseDocumentFrequency 
-    };
-  });
+  // Sort by frequency and return top terms
+  return Object.entries(frequencyMap)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10)
+    .map(entry => entry[0]);
 }
 
 // Extract key topics from text
 export async function extractKeyTopics(text: string, numTopics = 5): Promise<Topic[]> {
   try {
-    // Split into sections and then sentences
-    const sections = text.split(/Section \d+:/g).filter(Boolean);
-    const allSentences: string[] = [];
-    
-    sections.forEach(section => {
-      const sectionSentences = section
-        .split(/[.!?]+/)
-        .map(s => s.trim())
-        .filter(s => s.length > 10);
-      
-      allSentences.push(...sectionSentences);
-    });
-    
-    // Create document representation
-    const documents = sections.map(section => {
-      return section
-        .toLowerCase()
-        .replace(/[^\w\s]/g, '')
-        .split(/\s+/)
-        .filter(word => word.length > 3);
-    });
-    
-    // Extract all terms
-    const allTerms = documents
-      .flat()
-      .filter(term => term.length > 3 && !["this", "that", "then", "than", "with", "from"].includes(term));
-    
-    // Calculate TF-IDF scores
-    const scoredTerms = calculateTermFrequency(allTerms, documents);
-    
-    // Sort by score and group into clusters
-    const sortedTerms = [...scoredTerms].sort((a, b) => b.score - a.score);
-    const uniqueTerms = [...new Set(sortedTerms.map(item => item.term))];
-    
-    // Extract top terms for each topic
+    // Extract sections from the document
+    const sections = extractSections(text);
     const topics: Topic[] = [];
-    for (let i = 0; i < Math.min(numTopics, sections.length); i++) {
-      // Get section-specific terms
-      const sectionTerms = documents[i].filter(term => 
-        term.length > 3 && !["this", "that", "then", "than", "with", "from"].includes(term)
-      );
-      
-      // Get unique terms for this section
-      const uniqueSectionTerms = [...new Set(sectionTerms)];
-      
-      // Get top 5 terms
-      const topTerms = uniqueSectionTerms.slice(0, 5);
-      
-      // Get relevant sentences that contain these terms
-      const relevantSentences = allSentences.filter(sentence => 
-        topTerms.some(term => sentence.toLowerCase().includes(term))
-      );
+    
+    // Process each section to create topics
+    for (const section of sections.slice(0, numTopics)) {
+      const sentences = preprocessText(section.content);
+      const keywords = extractKeywords(section.content);
       
       topics.push({
-        terms: topTerms,
-        sentences: relevantSentences.slice(0, 3) // Get up to 3 relevant sentences
+        title: section.title,
+        keywords: keywords.slice(0, 5),
+        context: section.content.substring(0, 200) + '...',
+        sentences: sentences.slice(0, 3)
       });
     }
     
@@ -174,8 +153,8 @@ export async function generateQuestionsFromTopics(
   numQuestions: number
 ): Promise<any[]> {
   try {
-    // In a real implementation, this would use OpenAI API
-    // Here we'll simulate the question generation with better questions
+    // In a real implementation, this would use OpenAI API or another AI service
+    // Here we'll create more sophisticated questions based on the topics
     const questions: any[] = [];
     
     for (let i = 0; i < numQuestions; i++) {
@@ -185,19 +164,16 @@ export async function generateQuestionsFromTopics(
       const id = `gen-${Date.now()}-${i}`;
       
       if (type === 'mcq') {
-        // Create more sophisticated MCQs based on topic terms and sentences
-        const keyTerm = topic.terms[0];
-        const otherTerms = topic.terms.slice(1);
-        
+        // Create MCQs based on topic information
         const question = {
           id,
-          text: `Which concept is most closely related to ${keyTerm}?`,
+          text: `Which concept is most closely related to ${topic.title}?`,
           type: 'mcq',
           options: [
-            keyTerm,
-            otherTerms[0] || 'Alternative concept',
-            otherTerms[1] || 'Unrelated concept',
-            otherTerms[2] || 'Incorrect concept'
+            topic.keywords[0] || 'Primary concept',
+            topic.keywords[1] || 'Related concept',
+            topic.keywords[2] || 'Unrelated concept',
+            topic.keywords[3] || 'Incorrect concept'
           ],
           correctAnswer: 0 // First option is correct
         };
@@ -207,10 +183,10 @@ export async function generateQuestionsFromTopics(
         // Create fill-in-the-blank questions
         if (topic.sentences.length > 0) {
           const sentence = topic.sentences[0];
-          const keyTerm = topic.terms[0];
+          const keyTerm = topic.keywords[0];
           
           // Check if key term exists in the sentence
-          if (sentence.toLowerCase().includes(keyTerm.toLowerCase())) {
+          if (sentence.toLowerCase().includes(keyTerm)) {
             const blankSentence = sentence.replace(new RegExp(keyTerm, 'i'), '__________');
             
             const question = {
@@ -219,9 +195,9 @@ export async function generateQuestionsFromTopics(
               type: 'fill-in-the-blank',
               options: [
                 keyTerm,
-                topic.terms[1] || 'Incorrect term 1',
-                topic.terms[2] || 'Incorrect term 2',
-                topic.terms[3] || 'Incorrect term 3'
+                topic.keywords[1] || 'Incorrect term 1',
+                topic.keywords[2] || 'Incorrect term 2',
+                topic.keywords[3] || 'Incorrect term 3'
               ],
               correctAnswer: 0 // First option is correct
             };
@@ -230,7 +206,8 @@ export async function generateQuestionsFromTopics(
           } else {
             // Fallback if key term not found in sentence
             const words = sentence.split(/\s+/);
-            const wordToBlank = words.find(word => word.length > 5) || words[Math.floor(words.length / 2)];
+            const significantWords = words.filter(word => word.length > 5);
+            const wordToBlank = significantWords[0] || words[Math.floor(words.length / 2)];
             
             const blankSentence = sentence.replace(wordToBlank, '__________');
             
@@ -240,9 +217,9 @@ export async function generateQuestionsFromTopics(
               type: 'fill-in-the-blank',
               options: [
                 wordToBlank,
-                topic.terms[0] || 'Incorrect term 1',
-                topic.terms[1] || 'Incorrect term 2',
-                topic.terms[2] || 'Incorrect term 3'
+                topic.keywords[0] || 'Incorrect term 1',
+                topic.keywords[1] || 'Incorrect term 2',
+                topic.keywords[2] || 'Incorrect term 3'
               ],
               correctAnswer: 0 // First option is correct
             };
