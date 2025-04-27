@@ -8,7 +8,6 @@ import { toast } from '@/components/ui/sonner';
 import { useAuth } from '@/contexts/AuthContext';
 import { Upload, Loader2, Save } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Progress } from '@/components/ui/progress';
 import { getAvailableProvider, generateQuestionsFromText, validatePdfText } from '@/utils/mcqGenerator';
 import { hasApiKey } from '@/utils/apiConfig';
 import { FileUpload } from './FileUpload';
@@ -44,9 +43,13 @@ export default function ExamCreator() {
     }
   }, []);
 
+  const [pdfText, setPdfText] = useState('');
+  const [processingPdf, setProcessingPdf] = useState(false);
+  const [processingProgress, setProcessingProgress] = useState(0);
+
   const handleGenerateQuestions = async () => {
-    if (!file) {
-      toast.error('Please upload a PDF file first');
+    if (!pdfText) {
+      toast.error('Please upload and process a PDF file first');
       return;
     }
     
@@ -66,19 +69,10 @@ export default function ExamCreator() {
     setGenerationProgress(10);
 
     try {
-      // Extract text from PDF
-      setGenerationProgress(30);
-      const text = await extractTextFromPdf(file);
-      setPdfText(text);
-      
-      if (!validatePdfText(text)) {
-        throw new Error('Extracted text is too short or invalid');
-      }
-      
       setGenerationProgress(50);
 
       // Generate questions from the extracted text
-      const generatedQuestions = await generateQuestionsFromText(text, numQuestions);
+      const generatedQuestions = await generateQuestionsFromText(pdfText, numQuestions);
       
       setGenerationProgress(100);
       
@@ -178,7 +172,17 @@ export default function ExamCreator() {
             />
           </div>
           
-          <FileUpload file={file} onFileChange={setFile} />
+          <FileUpload 
+            file={file} 
+            onFileChange={setFile}
+            onTextExtracted={(text) => {
+              setPdfText(text);
+              setProcessingPdf(false);
+              toast.success('PDF processed successfully');
+            }}
+            isProcessing={processingPdf}
+            progress={processingProgress}
+          />
           
           {availableProviders.length > 0 && (
             <div className="space-y-2">
@@ -233,7 +237,7 @@ export default function ExamCreator() {
               />
               <Button 
                 onClick={handleGenerateQuestions} 
-                disabled={!file || isGenerating || availableProviders.length === 0}
+                disabled={!pdfText || isGenerating || availableProviders.length === 0}
                 className="flex items-center"
               >
                 {isGenerating ? (
@@ -254,7 +258,7 @@ export default function ExamCreator() {
               <div className="mt-2 space-y-1">
                 <Progress value={generationProgress} className="h-2" />
                 <p className="text-xs text-gray-500 text-center">
-                  {generationProgress < 30 && "Analyzing PDF content..."}
+                  {generationProgress < 30 && "Analyzing content..."}
                   {generationProgress >= 30 && generationProgress < 60 && "Extracting key topics..."}
                   {generationProgress >= 60 && generationProgress < 90 && "Generating questions..."}
                   {generationProgress >= 90 && "Finalizing..."}
