@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useData, Question, QuestionType } from '@/contexts/DataContext';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,6 +14,7 @@ import { hasApiKey } from '@/utils/apiConfig';
 import { FileUpload } from './FileUpload';
 import { QuestionTypeSelector } from './QuestionTypeSelector';
 import { GeneratedQuestions } from './GeneratedQuestions';
+import { Progress } from '@/components/ui/progress';
 
 export default function ExamCreator() {
   const { user } = useAuth();
@@ -29,6 +31,8 @@ export default function ExamCreator() {
   const [pdfText, setPdfText] = useState('');
   const [aiProvider, setAiProvider] = useState<string>('auto');
   const [availableProviders, setAvailableProviders] = useState<string[]>([]);
+  const [processingPdf, setProcessingPdf] = useState(false);
+  const [processingProgress, setProcessingProgress] = useState(0);
 
   // Check available AI providers
   useEffect(() => {
@@ -42,10 +46,6 @@ export default function ExamCreator() {
       setAiProvider(providers[0]);
     }
   }, []);
-
-  const [pdfText, setPdfText] = useState('');
-  const [processingPdf, setProcessingPdf] = useState(false);
-  const [processingProgress, setProcessingProgress] = useState(0);
 
   const handleGenerateQuestions = async () => {
     if (!pdfText) {
